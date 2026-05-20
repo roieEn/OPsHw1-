@@ -76,11 +76,23 @@ void _removeBackgroundSign(char *cmd_line) {
 // TODO: Add your implementation for classes in Commands.h 
 
 SmallShell::SmallShell() {
-    // TODO: add your implementation
+    og_name = "smash";
+    curr_name = og_name;
 }
 
 SmallShell::~SmallShell() {
     // TODO: add your implementation
+}
+
+void SmallShell::ch_prompt(const char *cmd_line){
+    if(cmd_line == NULL)
+        curr_name = og_name;
+    else
+        curr_name = cmd_line;
+}
+
+const char* SmallShell::get_prompt(){
+    return curr_name;
 }
 
 /**
@@ -88,10 +100,14 @@ SmallShell::~SmallShell() {
 */
 Command *SmallShell::CreateCommand(const char *cmd_line) {
     // For example:
-    /*
+    
     string cmd_s = _trim(string(cmd_line));
     string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
 
+    if(firstWord.compare("chprompt") == 0){
+        return new ChPrompt(cmd_line);
+    }
+    /*
     if (firstWord.compare("pwd") == 0) {
       return new GetCurrDirCommand(cmd_line);
     }
@@ -110,7 +126,12 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
 void SmallShell::executeCommand(const char *cmd_line) {
     // TODO: Add your implementation here
     // for example:
-    // Command* cmd = CreateCommand(cmd_line);
-    // cmd->execute();
+    Command* cmd = CreateCommand(cmd_line);
+    cmd->execute();
     // Please note that you must fork smash process for some commands (e.g., external commands....)
+}
+
+void ChPrompt::execute(){
+    SmallShell& s = SmallShell::getInstance();
+    s.ch_prompt(this->get_cmd_line());
 }

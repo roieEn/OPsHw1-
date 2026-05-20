@@ -8,22 +8,24 @@
 #define COMMAND_MAX_ARGS (20)
 
 class Command {
-    // TODO: Add your data members
+    const char* cmd_line;
 public:
-    Command(const char *cmd_line);
+    Command(const char *cmd_line) : cmd_line(cmd_line){}
 
-    virtual ~Command();
+    virtual ~Command() = default;
 
     virtual void execute() = 0;
 
     //virtual void prepare();
     //virtual void cleanup();
     // TODO: Add your extra methods if needed
+
+    const char* get_cmd_line() {return cmd_line;}
 };
 
 class BuiltInCommand : public Command {
 public:
-    BuiltInCommand(const char *cmd_line);
+    BuiltInCommand(const char *cmd_line) : Command(cmd_line){}
 
     virtual ~BuiltInCommand() {
     }
@@ -239,9 +241,22 @@ public:
     void execute() override;
 };
 
+class ChPrompt : public BuiltInCommand {
+    public:
+        ChPrompt(const char *cmd_line) : BuiltInCommand(cmd_line){}
+
+        virtual ~ChPrompt() {}
+
+        void execute() override;
+};
+
 class SmallShell {
 private:
-    // TODO: Add your data members
+    // TODO: Add your data members'
+
+    const char* og_name;
+    const char* curr_name;
+    
     SmallShell();
 
 public:
@@ -255,6 +270,10 @@ public:
         // Instantiated on first use.
         return instance;
     }
+
+    void ch_prompt(const char *cmd_line = NULL);
+
+    const char* get_prompt();
 
     ~SmallShell();
 
