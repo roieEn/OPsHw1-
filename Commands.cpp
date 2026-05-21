@@ -80,11 +80,13 @@ SmallShell::SmallShell() {
     strcpy(og_name, string("smash").c_str());
     curr_name = (char*) malloc(string(og_name).length() + 1);
     strcpy(curr_name, og_name);
+    jobs = new JobsList();
 }
 
 SmallShell::~SmallShell() {
     free(og_name);
     free(curr_name);
+    delete jobs;
 }
 
 void SmallShell::ch_prompt(const char *name){
@@ -118,6 +120,9 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     else if (firstWord.compare("pwd") == 0) {
       return new GetCurrDirCommand(cmd_line);
     }
+    else if(firstWord.compare("jobs") == 0){
+        return new JobsCommand(cmd_line, this->jobs);
+    }
     /*
     else if (firstWord.compare("showpid") == 0) {
       return new ShowPidCommand(cmd_line);
@@ -137,6 +142,17 @@ void SmallShell::executeCommand(const char *cmd_line) {
     Command* cmd = CreateCommand(cmd_line);
     cmd->execute();
     // Please note that you must fork smash process for some commands (e.g., external commands....)
+}
+
+void JobsList::addJob(Command* cmd, bool isStopped){
+    int id = jobs.size() == 0 ? 1 : jobs.front().get_id();
+    jobs.push_back(JobEntry(cmd, id));
+}
+
+//doesn't delete finished jobs. will need to add this feature after doing backround jobs.
+void JobsList::printJobsList(){
+    for(JobEntry j : jobs) 
+        std::cout << "[" << j.get_id() << "] " << j.get_cmd()->get_cmd_line() <<std::endl;
 }
 
 Command::Command(const char* cmd_line){
@@ -169,4 +185,8 @@ void GetCurrDirCommand::execute(){
     char* path = getcwd(NULL, 0);
     std::cout << path << std::endl;
     free(path);
+}
+
+void JobsCommand::execute(){
+    jobs->printJobsList();
 }

@@ -143,14 +143,23 @@ class QuitCommand : public BuiltInCommand {
 class JobsList {
 public:
     class JobEntry {
-        // TODO: Add your data members
+        Command* cmd;
+        int id;
+
+        public:
+
+            JobEntry(Command* cmd, int id) : cmd(cmd), id(id) {}
+            ~JobEntry() = default;
+
+            int get_id() {return id;}
+            Command* get_cmd() {return cmd;}
     };
 
-    // TODO: Add your data members
+    std::vector<JobEntry> jobs;
 public:
-    JobsList();
+    JobsList() = default;
 
-    ~JobsList();
+    ~JobsList() = default;
 
     void addJob(Command *cmd, bool isStopped = false);
 
@@ -172,9 +181,10 @@ public:
 };
 
 class JobsCommand : public BuiltInCommand {
-    // TODO: Add your data members
+    JobsList* jobs;
 public:
-    JobsCommand(const char *cmd_line, JobsList *jobs);
+    JobsCommand(const char *cmd_line, JobsList *jobs) : 
+        BuiltInCommand(cmd_line), jobs(jobs) {}
 
     virtual ~JobsCommand() {
     }
@@ -259,6 +269,8 @@ private:
 
     char* og_name;
     char* curr_name;
+
+    JobsList* jobs;
     
     SmallShell();
 
