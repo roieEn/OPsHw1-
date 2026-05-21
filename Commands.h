@@ -254,8 +254,8 @@ class SmallShell {
 private:
     // TODO: Add your data members'
 
-    const char* og_name;
-    const char* curr_name;
+    char* og_name;
+    char* curr_name;
     
     SmallShell();
 

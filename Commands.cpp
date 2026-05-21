@@ -76,19 +76,27 @@ void _removeBackgroundSign(char *cmd_line) {
 // TODO: Add your implementation for classes in Commands.h 
 
 SmallShell::SmallShell() {
-    og_name = "smash";
-    curr_name = og_name;
+    og_name = (char*) malloc(string("smash").length() + 1);
+    strcpy(og_name, string("smash").c_str());
+    curr_name = (char*) malloc(string(og_name).length() + 1);
+    strcpy(curr_name, og_name);
 }
 
 SmallShell::~SmallShell() {
-    // TODO: add your implementation
+    free(og_name);
+    free(curr_name);
 }
 
-void SmallShell::ch_prompt(const char *cmd_line){
-    if(cmd_line == NULL)
-        curr_name = og_name;
-    else
-        curr_name = cmd_line;
+void SmallShell::ch_prompt(const char *name){
+    free(curr_name);
+    if(name == NULL){
+        curr_name = (char*) malloc(string(og_name).length() + 1);
+        strcpy(curr_name, og_name);
+    }
+    else{
+        curr_name = (char*) malloc(string(name).length() + 1);
+        strcpy(curr_name, name);
+    }
 }
 
 const char* SmallShell::get_prompt(){
@@ -133,5 +141,10 @@ void SmallShell::executeCommand(const char *cmd_line) {
 
 void ChPrompt::execute(){
     SmallShell& s = SmallShell::getInstance();
-    s.ch_prompt(this->get_cmd_line());
+    char** args = (char**) malloc(sizeof(char*) * 20);
+    _parseCommandLine(this->get_cmd_line(), args);
+    s.ch_prompt(args[1]);
+    for(int i = 0; args[i] != NULL; i++)
+        free(args[i]);
+    free(args);
 }
