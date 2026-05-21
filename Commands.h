@@ -8,11 +8,11 @@
 #define COMMAND_MAX_ARGS (20)
 
 class Command {
-    const char* cmd_line;
+    char* cmd_line;
 public:
-    Command(const char *cmd_line) : cmd_line(cmd_line){}
+    Command(const char *cmd_line);
 
-    virtual ~Command() = default;
+    virtual ~Command();
 
     virtual void execute() = 0;
 

@@ -139,6 +139,13 @@ void SmallShell::executeCommand(const char *cmd_line) {
     // Please note that you must fork smash process for some commands (e.g., external commands....)
 }
 
+Command::Command(const char* cmd_line){
+    this->cmd_line = (char*) malloc(sizeof(char)*(string(cmd_line).length()+1));
+    strcpy(this->cmd_line, cmd_line);
+}
+
+Command::~Command(){free(this->cmd_line);}
+
 char** Command::make_args(const char* cmd_line){
     char** args = (char**) malloc(sizeof(char*) * 20);
     _parseCommandLine(this->get_cmd_line(), args);
