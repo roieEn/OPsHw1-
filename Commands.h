@@ -3,6 +3,8 @@
 #define SMASH_COMMAND_H_
 
 #include <vector>
+#include <map>
+#include <string.h>
 
 #define COMMAND_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
@@ -22,7 +24,7 @@ public:
 
     const char* get_cmd_line() {return cmd_line;}
 
-    char** make_args(const char* cmd_line);
+    char** make_args();
     void free_args(char** args);
 };
 
@@ -206,7 +208,7 @@ public:
 
 class AliasCommand : public BuiltInCommand {
 public:
-    AliasCommand(const char *cmd_line);
+    AliasCommand(const char *cmd_line) : BuiltInCommand(cmd_line){}
 
     virtual ~AliasCommand() {
     }
@@ -259,6 +261,8 @@ private:
 
     char* og_name;
     char* curr_name;
+
+    std::map<std::string, std::string> aliases;
     
     SmallShell();
 
@@ -282,7 +286,11 @@ public:
 
     void executeCommand(const char *cmd_line);
 
-    // TODO: add extra methods as needed
+    bool isAliasTaken(const std::string alias);
+
+    void addAlias(const std::string alias, const std::string arg);
+
+    const std::string get_alias(std::string word);
 };
 
 #endif //SMASH_COMMAND_H_

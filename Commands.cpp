@@ -1,10 +1,10 @@
 #include <unistd.h>
-#include <string.h>
 #include <iostream>
 #include <vector>
 #include <sstream>
 #include <sys/wait.h>
 #include <iomanip>
+#include <regex>
 #include "Commands.h"
 
 using namespace std;
@@ -103,6 +103,29 @@ const char* SmallShell::get_prompt(){
     return curr_name;
 }
 
+bool SmallShell::isAliasTaken(std::string alias){
+    for(const std::string name : {"chprompt", "showpid", "pwd", "cd", "jobs", 
+        "fg", "quit", "kill", "alias", "unalias", "unsetenv", "sysinfo",
+        "du", "whoami", "usbinfo"}) if(alias == name) return true;
+
+    for(pair<const std::string, const std::string> p : aliases) if(alias == p.first) return true;
+    return false;
+}
+
+void SmallShell::addAlias(const std::string alias, const string arg){
+    if(this->isAliasTaken(alias)) throw std::invalid_argument("alias already in use");
+    aliases[alias] = arg;
+}
+
+const string SmallShell::get_alias(string word){
+    try{
+        return aliases.at(word);
+    }
+    catch(std::out_of_range& e){
+        return "";
+    }
+}
+
 /**
 * Creates and returns a pointer to Command class which matches the given command line (cmd_line)
 */
@@ -112,11 +135,20 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     string cmd_s = _trim(string(cmd_line));
     string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
 
+    try{
+        firstWord = aliases.at(firstWord);
+        firstWord = firstWord.substr(0, firstWord.find_first_of(" \n"));
+    }
+    catch(std::out_of_range& e){}
+
     if(firstWord.compare("chprompt") == 0){
         return new ChPrompt(cmd_line);
     }
     else if (firstWord.compare("pwd") == 0) {
       return new GetCurrDirCommand(cmd_line);
+    }
+    else if(firstWord.compare("alias") == 0){
+        return new AliasCommand(cmd_line);
     }
     /*
     else if (firstWord.compare("showpid") == 0) {
@@ -144,11 +176,25 @@ Command::Command(const char* cmd_line){
     strcpy(this->cmd_line, cmd_line);
 }
 
-Command::~Command(){free(this->cmd_line);}
+Command::~Command(){
+    free(this->cmd_line); 
+}
 
-char** Command::make_args(const char* cmd_line){
+char** Command::make_args(){
+    const char* line;
+    std::string cmd_s, alias = _trim(string(this->cmd_line));
+    alias = alias.substr(0, alias.find_first_of(" \n"));
+    SmallShell& s = SmallShell::getInstance();
+    alias = s.get_alias(alias);
+    if(alias == "") line = this->cmd_line;
+    else{
+        cmd_s = _trim(string(cmd_line));
+        cmd_s.replace(0, cmd_s.find_first_of(" \n")+2, alias);
+        line = cmd_s.c_str();
+        std::cout << line << std::endl;
+    }
     char** args = (char**) malloc(sizeof(char*) * 20);
-    _parseCommandLine(this->get_cmd_line(), args);
+    _parseCommandLine(line, args);
     return args;
 }
 
@@ -160,7 +206,7 @@ void Command::free_args(char** args){
 
 void ChPrompt::execute(){
     SmallShell& s = SmallShell::getInstance();
-    char** args = this->make_args(this->get_cmd_line());
+    char** args = this->make_args();
     s.ch_prompt(args[1]);
     this->free_args(args);
 }
@@ -169,4 +215,22 @@ void GetCurrDirCommand::execute(){
     char* path = getcwd(NULL, 0);
     std::cout << path << std::endl;
     free(path);
+}
+
+void AliasCommand::execute(){
+    regex pattern = regex("^alias ([a-zA-Z0-9_]+)='([^']*)'$");
+    std::cmatch parts;
+    if(! std::regex_match(this->get_cmd_line(), parts, pattern)){
+        std::cerr << "smash error: alias: invalid alias format" << std::endl;
+        return;
+    }
+
+    try{
+        SmallShell& s = SmallShell::getInstance();
+        s.addAlias(parts[1].str(), parts[2].str());
+    }
+    catch(std::invalid_argument& e){
+        std::cerr << "smash error: alias: "<< parts[1] << " already exists or is a reserved command " 
+        <<std::endl; 
+    }
 }
