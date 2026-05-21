@@ -21,6 +21,9 @@ public:
     // TODO: Add your extra methods if needed
 
     const char* get_cmd_line() {return cmd_line;}
+
+    char** make_args(const char* cmd_line);
+    void free_args(char** args);
 };
 
 class BuiltInCommand : public Command {

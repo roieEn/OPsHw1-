@@ -139,12 +139,21 @@ void SmallShell::executeCommand(const char *cmd_line) {
     // Please note that you must fork smash process for some commands (e.g., external commands....)
 }
 
-void ChPrompt::execute(){
-    SmallShell& s = SmallShell::getInstance();
+char** Command::make_args(const char* cmd_line){
     char** args = (char**) malloc(sizeof(char*) * 20);
     _parseCommandLine(this->get_cmd_line(), args);
-    s.ch_prompt(args[1]);
+    return args;
+}
+
+void Command::free_args(char** args){
     for(int i = 0; args[i] != NULL; i++)
         free(args[i]);
     free(args);
+}
+
+void ChPrompt::execute(){
+    SmallShell& s = SmallShell::getInstance();
+    char** args = this->make_args(this->get_cmd_line());
+    s.ch_prompt(args[1]);
+    this->free_args(args);
 }
