@@ -115,10 +115,10 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     if(firstWord.compare("chprompt") == 0){
         return new ChPrompt(cmd_line);
     }
-    /*
-    if (firstWord.compare("pwd") == 0) {
+    else if (firstWord.compare("pwd") == 0) {
       return new GetCurrDirCommand(cmd_line);
     }
+    /*
     else if (firstWord.compare("showpid") == 0) {
       return new ShowPidCommand(cmd_line);
     }
@@ -156,4 +156,10 @@ void ChPrompt::execute(){
     char** args = this->make_args(this->get_cmd_line());
     s.ch_prompt(args[1]);
     this->free_args(args);
+}
+
+void GetCurrDirCommand::execute(){
+    char* path = getcwd(NULL, 0);
+    std::cout << path << std::endl;
+    free(path);
 }
