@@ -189,9 +189,8 @@ char** Command::make_args(){
     if(alias == "") line = this->cmd_line;
     else{
         cmd_s = _trim(string(cmd_line));
-        cmd_s.replace(0, cmd_s.find_first_of(" \n")+2, alias);
+        cmd_s.replace(0, cmd_s.find_first_of(" \n"), alias);
         line = cmd_s.c_str();
-        std::cout << line << std::endl;
     }
     char** args = (char**) malloc(sizeof(char*) * 20);
     _parseCommandLine(line, args);
