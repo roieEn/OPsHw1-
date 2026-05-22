@@ -212,7 +212,8 @@ void ChPrompt::execute(){
 
 void GetCurrDirCommand::execute(){
     char* path = getcwd(NULL, 0);
-    std::cout << path << std::endl;
+    write(1, path, strlen(path));
+    write(1, "\n", 1);
     free(path);
 }
 
