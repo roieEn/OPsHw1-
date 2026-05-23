@@ -230,7 +230,8 @@ void AliasCommand::execute(){
     regex pattern = regex("^alias ([a-zA-Z0-9_]+)='([^']*)'$");
     std::cmatch parts;
     if(! std::regex_match(this->get_cmd_line(), parts, pattern)){
-        std::cerr << "smash error: alias: invalid alias format" << std::endl;
+        const char* problem = "smash error: alias: invalid alias format\n";
+        write(2, problem, strlen(problem));
         return;
     }
 
@@ -239,8 +240,10 @@ void AliasCommand::execute(){
         s.addAlias(parts[1].str(), parts[2].str());
     }
     catch(std::invalid_argument& e){
-        std::cerr << "smash error: alias: "<< parts[1] << " already exists or is a reserved command " 
-        <<std::endl; 
+        const char *problem1 = "smash error: alias: ", *problem2 = " already exists or is a reserved command\n";
+        write(2, problem1, strlen(problem1));
+        write(2, parts[1].str().c_str(), parts[1].str().length());
+        write(2, problem2, strlen(problem2));
     }
 }
 
