@@ -227,8 +227,11 @@ public:
 };
 
 class UnSetEnvCommand : public BuiltInCommand {
+    std::vector<std::string>* ReadEnv(std::string path);
+    bool ExistsInEnv(std::string arg, std::vector<std::string> *allvars);
+    void DeleteVar(const char* arg);
 public:
-    UnSetEnvCommand(const char *cmd_line);
+    UnSetEnvCommand(const char *cmd_line) : BuiltInCommand(cmd_line){}
 
     virtual ~UnSetEnvCommand() {
     }

@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <regex>
 #include "Commands.h"
+#include <fcntl.h>
 
 using namespace std;
 
@@ -150,6 +151,9 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     else if(firstWord.compare("alias") == 0){
         return new AliasCommand(cmd_line);
     }
+    else if(firstWord.compare("unsetenv") == 0){
+        return new UnSetEnvCommand(cmd_line);
+    }
     /*
     else if (firstWord.compare("showpid") == 0) {
       return new ShowPidCommand(cmd_line);
@@ -170,6 +174,11 @@ void SmallShell::executeCommand(const char *cmd_line) {
     cmd->execute();
     // Please note that you must fork smash process for some commands (e.g., external commands....)
 }
+
+
+
+
+
 
 Command::Command(const char* cmd_line){
     this->cmd_line = (char*) malloc(sizeof(char)*(string(cmd_line).length()+1));
@@ -232,5 +241,110 @@ void AliasCommand::execute(){
     catch(std::invalid_argument& e){
         std::cerr << "smash error: alias: "<< parts[1] << " already exists or is a reserved command " 
         <<std::endl; 
+    }
+}
+
+void UnSetEnvCommand::execute(){
+    char** args = this->make_args();
+    if(args[1] == NULL){
+        const char* problem = "smash error: unsetenv: not enough arguments\n";
+        write(2, problem, strlen(problem));
+        free_args(args);
+        return;
+    }
+    string path = "/proc/p/environ";
+    string pid = std::to_string(getpid());
+    path.replace(6, 1, pid);
+    vector<std::string> *allvars;
+    try{
+        allvars = this->ReadEnv(path);
+    }
+    catch(runtime_error& e){return;}
+    for(int i = 1; args[i] != NULL; ++i){
+        if(this->ExistsInEnv((string(args[i]) + "="), allvars)) DeleteVar(args[i]);
+        else{
+            const char *problem1 = "smash error: unsetenv: ", *problem2 = " does not exist\n";
+            write(2, problem1, strlen(problem1));
+            write(2, args[i], strlen(args[i]));
+            write(2, problem2, strlen(problem2));
+        }
+    }
+    delete(allvars);
+    free_args(args);
+}
+
+vector<std::string>* UnSetEnvCommand::ReadEnv(std::string path){
+    int fd = open(path.c_str(), O_RDONLY);
+    if(fd < 0) {
+        const char* problem = "smash error: open failed";
+        write(2, problem, strlen(problem));
+        close(fd);
+        throw std::runtime_error(problem);
+    }
+    int size = 1024, realsize = 0;
+    char *buff = (char*) malloc(sizeof(char)*1024), *place = buff;
+    while(1){
+        int amount = read(fd, place, 1024);
+        realsize += amount;
+        if(amount < 1024) break;
+        char* temp = (char*) realloc(buff, ((size+=1024)*sizeof(char)));
+        if(temp == NULL){
+                const char* problem = "smash error: realloc failed\n";
+                write(2, problem, strlen(problem));
+                free(buff);
+                close(fd);
+                throw runtime_error(problem);
+            }
+        buff = temp;
+        place = buff + realsize;
+    }
+    char* temp = (char*) realloc(buff, (realsize)*sizeof(char));
+    if(temp == NULL){
+        const char* problem = "smash error: realloc failed\n";
+        write(2, problem, strlen(problem));
+        free(buff);
+        close(fd);
+        throw runtime_error(problem);
+    }
+    buff = temp;
+    int amount_read = 0; 
+    const char* curr_place = buff;
+    vector<std::string> *Env = new vector<std::string>;
+    while(amount_read < realsize){
+        Env->push_back(string(curr_place));
+        amount_read += (strlen(curr_place) + 1);
+        curr_place += (strlen(curr_place) + 1);
+    }
+    close(fd);
+    free(buff);
+    return Env;
+}
+
+bool UnSetEnvCommand::ExistsInEnv(std::string arg, vector<std::string> *allvars){
+    for(std::string s : *allvars) if(s.find(arg) == 0) return true;
+    return false;
+}
+
+//arg surly exists in __environ. oterwise, undefined behavior may occur. 
+void UnSetEnvCommand::DeleteVar(const char* arg){
+    extern char** __environ;
+    char **curr_place = __environ;
+    std::cout << "before" << std::endl;
+    {
+        for(char **temp = __environ; *temp != NULL; temp++) std::cout << *temp << endl;
+    }
+    while(true){
+        if(string(*curr_place).find(string(arg) + "=") == 0) {
+            break;
+        }
+        curr_place++;
+    }
+    while(*curr_place != NULL) {
+        char **temp = curr_place++;
+        *temp = *curr_place;
+    }
+    std::cout << "after" << std::endl;
+    {
+        for(char **temp = __environ; *temp != NULL; temp++) std::cout << *temp << endl;
     }
 }
