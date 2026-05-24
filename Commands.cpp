@@ -120,10 +120,13 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     else if (firstWord.compare("pwd") == 0) {
       return new GetCurrDirCommand(cmd_line);
     }
-    /*
     else if (firstWord.compare("showpid") == 0) {
       return new ShowPidCommand(cmd_line);
     }
+    else if (firstWord.compare("cd") == 0) {
+        return new ChangeDirCommand(cmd_line, nullptr);
+    }
+    /*
     else if ...
     .....
     else {
@@ -171,4 +174,40 @@ void GetCurrDirCommand::execute(){
     char* path = getcwd(NULL, 0);
     std::cout << path << std::endl;
     free(path);
+}
+
+void ChangeDirCommand::execute() {
+    char** args = this->make_args(this->get_cmd_line());
+    if (args[1] == nullptr) {
+        this->free_args(args);
+        return;
+    }
+    if(args[2] != nullptr) {
+        const std::string error_msg = "smash error: cd: too many arguments\n";
+        write(2, error_msg.c_str(), error_msg.length());
+        this->free_args(args);
+        return;
+    }
+    char* path = args[1];
+    if(strcmp(path, "-") == 0) {
+        path = *this->pold_dir;
+        if(path == nullptr) {
+            const std::string error_msg = "smash error: cd: OLDPWD not set\n";
+            write(2, error_msg.c_str(), error_msg.length());
+            this->free_args(args);
+            return;
+        }
+    }
+    char* current_dir = getcwd(NULL, 0);
+    if(chdir(path) == -1) {
+        perror("smash error: chdir failed");
+        free(current_dir);
+    }
+    else {
+        if(*this->pold_dir != nullptr) {
+            free(*this->pold_dir);
+        }
+        *this->pold_dir = current_dir;
+    }
+    this->free_args(args);
 }
