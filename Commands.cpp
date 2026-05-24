@@ -6,6 +6,7 @@
 #include <sys/wait.h>
 #include <iomanip>
 #include "Commands.h"
+#include "sys/syscall.h"
 
 using namespace std;
 
@@ -93,11 +94,12 @@ void SmallShell::ch_prompt(const char *name){
         curr_name = (char*) malloc(string(og_name).length() + 1);
         strcpy(curr_name, og_name);
     }
-    else{
+    else {
         curr_name = (char*) malloc(string(name).length() + 1);
         strcpy(curr_name, name);
     }
 }
+
 
 const char* SmallShell::get_prompt(){
     return curr_name;
