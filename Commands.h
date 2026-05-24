@@ -218,7 +218,7 @@ public:
 
 class UnAliasCommand : public BuiltInCommand {
 public:
-    UnAliasCommand(const char *cmd_line);
+    UnAliasCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {}
 
     virtual ~UnAliasCommand() {
     }
@@ -291,7 +291,9 @@ public:
 
     bool isAliasTaken(const std::string alias);
 
-    void addAlias(const std::string alias, const std::string arg);
+    void addAlias(const std::string& alias, const std::string& arg);
+
+    void removeAlias(const std::string& alias);
 
     const std::string get_alias(std::string word);
 };

@@ -113,10 +113,18 @@ bool SmallShell::isAliasTaken(std::string alias){
     return false;
 }
 
-void SmallShell::addAlias(const std::string alias, const string arg){
+void SmallShell::addAlias(const std::string& alias, const string& arg){
     if(this->isAliasTaken(alias)) throw std::invalid_argument("alias already in use");
     aliases[alias] = arg;
 }
+
+void SmallShell::removeAlias(const std::string& alias) {
+    if(!this->isAliasTaken(alias)) {
+        throw std::invalid_argument("no such alias in use");
+    }
+    aliases.erase(alias);
+}
+
 
 const string SmallShell::get_alias(string word){
     try{
@@ -150,6 +158,9 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     }
     else if(firstWord.compare("alias") == 0){
         return new AliasCommand(cmd_line);
+    }
+    else if(firstWord.compare("unalias") == 0){
+        return new UnAliasCommand(cmd_line);
     }
     else if(firstWord.compare("unsetenv") == 0){
         return new UnSetEnvCommand(cmd_line);
@@ -246,6 +257,30 @@ void AliasCommand::execute(){
         write(2, problem2, strlen(problem2));
     }
 }
+
+void UnAliasCommand::execute() {
+    char** args = this->make_args();
+    if(args[1] == nullptr) {
+        const char* problem = "smash error: unalias: not enough arguments\n";
+        write(2, problem, strlen(problem));
+        free_args(args);
+        return;
+    }
+    for(int i = 1; args[i] != nullptr; i++) {
+        try {
+            SmallShell& s = SmallShell::getInstance();
+            s.removeAlias(args[i]);
+        }
+        catch (std::invalid_argument& e) {
+            const std::string problem = "smash error: unalias: " + std::string(args[i]) + " alias does not exist\n";
+            write(2, problem.c_str(), problem.length());
+            free_args(args);
+            return;
+        }
+    }
+    this->free_args(args);
+}
+
 
 void UnSetEnvCommand::execute(){
     char** args = this->make_args();
