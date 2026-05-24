@@ -6,7 +6,6 @@
 #include <sys/wait.h>
 #include <iomanip>
 #include "Commands.h"
-#include "sys/syscall.h"
 
 using namespace std;
 
@@ -120,10 +119,10 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     else if (firstWord.compare("pwd") == 0) {
       return new GetCurrDirCommand(cmd_line);
     }
-    /*
     else if (firstWord.compare("showpid") == 0) {
       return new ShowPidCommand(cmd_line);
     }
+    /*
     else if ...
     .....
     else {
@@ -172,3 +171,11 @@ void GetCurrDirCommand::execute(){
     std::cout << path << std::endl;
     free(path);
 }
+
+void ShowPidCommand::execute() {
+    const std::string smash_pid_str = "smash pid is " + std::to_string(getpid()) + "\n";
+    write(1,smash_pid_str.c_str(),smash_pid_str.length());
+}
+
+
+
