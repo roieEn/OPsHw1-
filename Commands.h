@@ -36,7 +36,8 @@ public:
 
 class ExternalCommand : public Command {
 public:
-    ExternalCommand(const char *cmd_line);
+    bool is_bg;
+    ExternalCommand(const char *cmd_line, bool bg);
 
     virtual ~ExternalCommand() {
     }
