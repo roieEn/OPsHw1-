@@ -146,10 +146,11 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     }
     catch(std::out_of_range& e){}
 
-    regex pattern = regex("(^.+)\s>\s([a-z0-9]+)");
+    regex pattern = regex("(^(.*?)\s*(>>|>)\s*([a-z0-9.-_]+)\s*&?\s*$)");
     cmatch parts;
     if(regex_match(cmd_s.c_str(), parts, pattern)){
-        return new RedirectionCommand(string(parts[1]).c_str(), string(parts[2]));
+        return new RedirectionCommand(string(parts[1]).c_str(), 
+            string(parts[3]), string(parts[2]));
     }
 
     if(firstWord.compare("chprompt") == 0){
@@ -183,7 +184,6 @@ void SmallShell::executeCommand(const char *cmd_line) {
     Command* cmd = CreateCommand(cmd_line);
     cmd->execute();
     delete cmd;
-    RecoverIO();
     // Please note that you must fork smash process for some commands (e.g., external commands....)
 }
 
@@ -406,4 +406,15 @@ void UnSetEnvCommand::DeleteVar(const char* arg){
     {
         for(char **temp = __environ; *temp != NULL; temp++) std::cout << *temp << endl;
     }
+}
+
+void RedirectionCommand::execute(){
+    SmallShell &s = SmallShell::getInstance();
+    SmallShell::options option = this->op.compare(">") == 0 ? 
+        SmallShell::no_append : SmallShell::append;
+    s.RedirectOut(this->path, option);
+    Command *cmd = s.CreateCommand(this->get_cmd_line());
+    cmd->execute();
+    delete cmd;
+    s.RecoverIO();
 }
