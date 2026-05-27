@@ -74,6 +74,17 @@ void _removeBackgroundSign(char *cmd_line) {
     cmd_line[str.find_last_not_of(WHITESPACE, idx) + 1] = 0;
 }
 
+bool isComplex(char** args) {
+    if(args == nullptr)
+        return false;
+    for(int i = 0; args[i] != nullptr; i++) {
+        if(strchr(args[i],'*') != nullptr || strchr(args[i],'?') != nullptr) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // TODO: Add your implementation for classes in Commands.h 
 
 SmallShell::SmallShell() {
@@ -113,6 +124,11 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     
     string cmd_s = _trim(string(cmd_line));
     string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
+    bool bg = false;
+    std::string cmd = cmd_line;
+    if(_isBackgroundComamnd(cmd_line)) {
+        bg = true;
+    }
 
     if(firstWord.compare("chprompt") == 0){
         return new ChPrompt(cmd_line);
@@ -126,10 +142,15 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     }
     else if ...
     .....
-    else {
-      return new ExternalCommand(cmd_line);
-    }
     */
+    else {
+        if(bg) {
+            return new ExternalCommand(cmd_line, true);
+        }
+        else {
+            return new ExternalCommand(cmd_line, false);
+        }
+    }
     return nullptr;
 }
 
@@ -137,7 +158,22 @@ void SmallShell::executeCommand(const char *cmd_line) {
     // TODO: Add your implementation here
     // for example:
     Command* cmd = CreateCommand(cmd_line);
-    cmd->execute();
+    if(ExternalCommand* extCmd = dynamic_cast<ExternalCommand*>(cmd)) {//if succeeds then cmd is external
+        const pid_t p = fork();
+        if(p > 0) {
+            if(!extCmd->is_bg) {
+                wait(NULL);
+            }
+            else {
+
+            }
+        }
+        else {
+            cmd->execute();
+        }
+    }
+    else
+        cmd->execute();
     // Please note that you must fork smash process for some commands (e.g., external commands....)
 }
 
@@ -150,7 +186,9 @@ Command::~Command(){free(this->cmd_line);}
 
 char** Command::make_args(const char* cmd_line){
     char** args = (char**) malloc(sizeof(char*) * 20);
-    _parseCommandLine(this->get_cmd_line(), args);
+    char* copy_cmd_line = strdup(cmd_line);
+    _removeBackgroundSign(copy_cmd_line);
+    _parseCommandLine(copy_cmd_line, args);
     return args;
 }
 
@@ -171,4 +209,14 @@ void GetCurrDirCommand::execute(){
     char* path = getcwd(NULL, 0);
     std::cout << path << std::endl;
     free(path);
+}
+
+void ExternalCommand::execute() { //will always be the son
+    char** args = this->make_args(this->get_cmd_line());
+    if(!isComplex(args)) { //should not have *,? and & because of make_args
+        if(args[0] != nullptr) {
+            execvp(args[0], args); //should leave automatically
+            perror("smash error: execvp failed"); // there is no command like that/no fitting flags
+        }
+    }
 }
