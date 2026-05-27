@@ -49,9 +49,10 @@ public:
 
 class RedirectionCommand : public Command {
     std::string path;
+    std::string op;
 public:
-    explicit RedirectionCommand(const char *cmd_line, std::string path) : 
-        Command(cmd_line), path(path) {}
+    explicit RedirectionCommand(const char *cmd_line, std::string path, std::string op) : 
+        Command(cmd_line), path(path), op(op) {}
 
     virtual ~RedirectionCommand() {
     }

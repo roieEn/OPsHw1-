@@ -146,7 +146,7 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     }
     catch(std::out_of_range& e){}
 
-    regex pattern = regex("(^(.*?)\s*(>>|>)\s*([a-z0-9.-_]+)\s*&?\s*$)");
+    std::regex pattern(R"(^(.*?)\s*(>>|>)\s*([a-z0-9./_-]+)\s*&?\s*$)");
     cmatch parts;
     if(regex_match(cmd_s.c_str(), parts, pattern)){
         return new RedirectionCommand(string(parts[1]).c_str(), 
