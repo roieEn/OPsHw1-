@@ -256,25 +256,7 @@ char** Command::make_args(){
         line = cmd_s.c_str();
     }
     char** args = (char**) malloc(sizeof(char*) * 20);
-    int length = _parseCommandLine(line, args);
-    if(length >= 3){
-        if(strcmp(">", args[length-2]) == 0){
-            try{
-            s.RedirectOut(string(args[length-1]));
-        }
-        catch(exception &e){return NULL;}
-        free(args[length-2]); args[length-2] = NULL;
-        free(args[length-1]);
-        }
-        else if(strcmp(">>", args[length-2]) == 0){
-            try{
-            s.RedirectOut(string(args[length-1]), SmallShell::options::append);
-        }
-        catch(exception &e){return NULL;}
-        free(args[length-2]); args[length-2] = NULL;
-        free(args[length-1]);
-        }
-    }
+    _parseCommandLine(line, args);
     return args;
 }
 
