@@ -295,6 +295,8 @@ void GetCurrDirCommand::execute(){
 }
 
 void AliasCommand::execute(){
+    char **args = make_args();
+    free_args(args);
     regex pattern = regex("^alias ([a-zA-Z0-9_]+)='([^']*)'$");
     std::cmatch parts;
     if(! std::regex_match(this->get_cmd_line(), parts, pattern)){
