@@ -155,7 +155,6 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
             return new ExternalCommand(cmd_line, false);
         }
     }
-    */
     return nullptr;
 }
 
