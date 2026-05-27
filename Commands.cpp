@@ -135,17 +135,21 @@ const string SmallShell::get_alias(string word){
 * Creates and returns a pointer to Command class which matches the given command line (cmd_line)
 */
 Command *SmallShell::CreateCommand(const char *cmd_line) {
-    // For example:
     
+
     string cmd_s = _trim(string(cmd_line));
     string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
 
+    //check for alias and replace if found
     try{
-        firstWord = aliases.at(firstWord);
-        firstWord = firstWord.substr(0, firstWord.find_first_of(" \n"));
+        string alias = aliases.at(firstWord);
+        cmd_s.replace(0, cmd_s.find_first_of(" \n"), alias);
+        firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
+        cmd_line = cmd_s.c_str();
     }
     catch(std::out_of_range& e){}
 
+    //redirection command
     std::regex pattern(R"(^(.*?)\s*(>>|>)\s*([a-z0-9./_-]+)\s*&?\s*$)");
     cmatch parts;
     if(regex_match(cmd_s.c_str(), parts, pattern)){
@@ -244,19 +248,8 @@ Command::~Command(){
 }
 
 char** Command::make_args(){
-    const char* line;
-    std::string cmd_s, alias = _trim(string(this->cmd_line));
-    alias = alias.substr(0, alias.find_first_of(" \n"));
-    SmallShell& s = SmallShell::getInstance();
-    alias = s.get_alias(alias);
-    if(alias == "") line = this->cmd_line;
-    else{
-        cmd_s = _trim(string(cmd_line));
-        cmd_s.replace(0, cmd_s.find_first_of(" \n"), alias);
-        line = cmd_s.c_str();
-    }
     char** args = (char**) malloc(sizeof(char*) * 20);
-    _parseCommandLine(line, args);
+    _parseCommandLine(this->cmd_line, args);
     return args;
 }
 
