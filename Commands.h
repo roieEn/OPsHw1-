@@ -264,6 +264,8 @@ private:
 
     char* og_name;
     char* curr_name;
+    int in_recover;
+    int out_recover;
 
     std::map<std::string, std::string> aliases;
     
@@ -294,6 +296,14 @@ public:
     void addAlias(const std::string alias, const std::string arg);
 
     const std::string get_alias(std::string word);
+
+    void RedirectIn(std::string in_path);
+
+    enum options {append, no_append};
+
+    void RedirectOut(std::string out_path, options option = no_append);
+
+    void RecoverIO();
 };
 
 #endif //SMASH_COMMAND_H_
