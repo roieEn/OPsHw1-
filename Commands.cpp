@@ -146,6 +146,12 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     }
     catch(std::out_of_range& e){}
 
+    regex pattern = regex("(^.+)\s>\s([a-z0-9]+)");
+    cmatch parts;
+    if(regex_match(cmd_s.c_str(), parts, pattern)){
+        return new RedirectionCommand(string(parts[1]).c_str(), string(parts[2]));
+    }
+
     if(firstWord.compare("chprompt") == 0){
         return new ChPrompt(cmd_line);
     }

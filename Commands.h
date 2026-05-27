@@ -48,9 +48,10 @@ public:
 
 
 class RedirectionCommand : public Command {
-    // TODO: Add your data members
+    std::string path;
 public:
-    explicit RedirectionCommand(const char *cmd_line);
+    explicit RedirectionCommand(const char *cmd_line, std::string path) : 
+        Command(cmd_line), path(path) {}
 
     virtual ~RedirectionCommand() {
     }
@@ -59,7 +60,6 @@ public:
 };
 
 class PipeCommand : public Command {
-    // TODO: Add your data members
 public:
     PipeCommand(const char *cmd_line);
 
