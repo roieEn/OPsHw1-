@@ -153,36 +153,6 @@ void SmallShell::removeAlias(const std::string& alias) {
 }
 
 
-const string SmallShell::get_alias(string word){
-    try{
-        return aliases.at(word);
-void SmallShell::RedirectOut(std::string out_path, options option){
-    char* p = getcwd(NULL, 0);
-    if(p == NULL){
-        const char *problem = "smash error: getcwd failed\n";
-        write(2, problem, strlen(problem));
-        throw runtime_error(problem);
-    }
-    string path = string(p);
-    free(p);
-    path += ("/" + out_path);
-    this->out_recover = dup(1);
-    if(out_recover < 0){
-        const char *problem = "smash error: dup failed\n";
-        write(2, problem, strlen(problem));
-        this->out_recover = -1;
-        throw runtime_error(problem);
-    }
-    int fd = option == append ? open(path.c_str(), O_CREAT | O_APPEND | O_WRONLY, 0666) :
-        open(path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0666);
-    if(fd < 0){
-        const char *problem = "smash error: open failed\n";
-        write(2, problem, strlen(problem));
-        throw runtime_error(problem);
-    }
-    dup2(fd, 1);
-    close(fd);
-}
 
 void SmallShell::RecoverIO(){
     if(in_recover != -1){
@@ -352,7 +322,7 @@ void GetCurrDirCommand::execute(){
 }
 
 void ExternalCommand::execute() { //will always be the son
-    char** args = this->make_args(this->get_cmd_line());
+    char** args = this->make_args();
     if(!isComplex(args)) { //should not have *,? and & because of make_args
         execvp(args[0], args); //should leave automatically
         perror("smash error: execvp failed"); // there is no command like that/no fitting flags
@@ -550,7 +520,7 @@ void RedirectionCommand::execute(){
 }
 
 void ChangeDirCommand::execute() {
-    char** args = this->make_args(this->get_cmd_line());
+    char** args = this->make_args();
     if (args[1] == nullptr) {
         this->free_args(args);
         return;
