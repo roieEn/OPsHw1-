@@ -108,7 +108,7 @@ const char* SmallShell::get_prompt(){
 }
 
 bool SmallShell::isAliasTaken(std::string alias){
-    for(const std::string name : {"chprompt", "showpid", "pwd", "cd", "jobs", 
+    for(const std::string name : {"chprompt", "showpid", "pwd", "cd", "jobs",
         "fg", "quit", "kill", "alias", "unalias", "unsetenv", "sysinfo",
         "du", "whoami", "usbinfo"}) if(alias == name) return true;
 
@@ -149,7 +149,7 @@ void SmallShell::RedirectOut(std::string out_path, options option){
         this->out_recover = -1;
         throw runtime_error(problem);
     }
-    int fd = option == append ? open(path.c_str(), O_CREAT | O_APPEND | O_WRONLY, 0666) : 
+    int fd = option == append ? open(path.c_str(), O_CREAT | O_APPEND | O_WRONLY, 0666) :
         open(path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0666);
     if(fd < 0){
         const char *problem = "smash error: open failed\n";
@@ -193,7 +193,7 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     std::regex redidect_pattern = regex("^(.*?)\\s*(>>|>)\\s*([a-z0-9./_-]+)\\s*&?\\s*$");
     cmatch redirect_parts;
     if(regex_match(cmd_s.c_str(), redirect_parts, redidect_pattern)){
-        return new RedirectionCommand(string(redirect_parts[1]).c_str(), 
+        return new RedirectionCommand(string(redirect_parts[1]).c_str(),
             string(redirect_parts[3]), string(redirect_parts[2]));
     }
 
@@ -213,6 +213,10 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     else if (firstWord.compare("showpid") == 0) {
       return new ShowPidCommand(cmd_line);
     }
+    else if (firstWord.compare("cd") == 0) {
+        return new ChangeDirCommand(cmd_line, nullptr);
+    }
+    /*
     else if ...
     .....
     else {
@@ -239,7 +243,7 @@ Command::Command(const char* cmd_line){
 }
 
 Command::~Command(){
-    free(this->cmd_line); 
+    free(this->cmd_line);
 }
 
 char** Command::make_args(){
@@ -361,7 +365,7 @@ vector<std::string>* UnSetEnvCommand::ReadEnv(std::string path){
         throw runtime_error(problem);
     }
     buff = temp;
-    int amount_read = 0; 
+    int amount_read = 0;
     const char* curr_place = buff;
     vector<std::string> *Env = new vector<std::string>;
     while(amount_read < realsize){
@@ -379,7 +383,7 @@ bool UnSetEnvCommand::ExistsInEnv(std::string arg, vector<std::string> *allvars)
     return false;
 }
 
-//arg surly exists in __environ. oterwise, undefined behavior may occur. 
+//arg surly exists in __environ. oterwise, undefined behavior may occur.
 void UnSetEnvCommand::DeleteVar(const char* arg){
     extern char** __environ;
     char **curr_place = __environ;
@@ -405,11 +409,47 @@ void UnSetEnvCommand::DeleteVar(const char* arg){
 
 void RedirectionCommand::execute(){
     SmallShell &s = SmallShell::getInstance();
-    SmallShell::options option = this->op.compare(">") == 0 ? 
+    SmallShell::options option = this->op.compare(">") == 0 ?
         SmallShell::no_append : SmallShell::append;
     s.RedirectOut(this->path, option);
     Command *cmd = s.CreateCommand(this->get_cmd_line());
     cmd->execute();
     delete cmd;
     s.RecoverIO();
+}
+
+void ChangeDirCommand::execute() {
+    char** args = this->make_args(this->get_cmd_line());
+    if (args[1] == nullptr) {
+        this->free_args(args);
+        return;
+    }
+    if(args[2] != nullptr) {
+        const std::string error_msg = "smash error: cd: too many arguments\n";
+        write(2, error_msg.c_str(), error_msg.length());
+        this->free_args(args);
+        return;
+    }
+    char* path = args[1];
+    if(strcmp(path, "-") == 0) {
+        path = *this->pold_dir;
+        if(path == nullptr) {
+            const std::string error_msg = "smash error: cd: OLDPWD not set\n";
+            write(2, error_msg.c_str(), error_msg.length());
+            this->free_args(args);
+            return;
+        }
+    }
+    char* current_dir = getcwd(NULL, 0);
+    if(chdir(path) == -1) {
+        perror("smash error: chdir failed");
+        free(current_dir);
+    }
+    else {
+        if(*this->pold_dir != nullptr) {
+            free(*this->pold_dir);
+        }
+        *this->pold_dir = current_dir;
+    }
+    this->free_args(args);
 }
