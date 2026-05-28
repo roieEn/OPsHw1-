@@ -302,6 +302,8 @@ public:
 
     void ch_prompt(const char *cmd_line = NULL);
 
+    void* AddToJobList(Command*, bool);
+
     const char* get_prompt();
 
     ~SmallShell();

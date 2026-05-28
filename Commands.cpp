@@ -195,6 +195,11 @@ void SmallShell::RecoverIO(){
     }
 }
 
+void *SmallShell::AddToJobList(Command* cmd, bool isStopped) {
+    this->jobs->addJob(cmd, isStopped);
+}
+
+
 /**
 * Creates and returns a pointer to Command class which matches the given command line (cmd_line)
 */
@@ -276,15 +281,16 @@ void SmallShell::executeCommand(const char *cmd_line) {
     delete cmd;
     if(ExternalCommand* extCmd = dynamic_cast<ExternalCommand*>(cmd)) {//if succeeds then cmd is external
         const pid_t p = fork();
-        if(p > 0) {
+        if(p > 0) { //parent
             if(!extCmd->is_bg) {
                 wait(NULL);
             }
             else {
-
+                  this->AddToJobList(extCmd, false); //not sure what isStopped should be, when is it ever true and we want to add it?
             }
         }
-        else {
+        else { //child
+            setpgrp();
             cmd->execute();
         }
     }
@@ -296,11 +302,11 @@ void SmallShell::executeCommand(const char *cmd_line) {
 
 
 void JobsList::addJob(Command* cmd, bool isStopped){
-    int id = jobs.size() == 0 ? 1 : jobs.front().get_id();
+    int id = jobs.size() == 0 ? 1 : jobs.front().get_id(); //should be +1 ?
     jobs.push_back(JobEntry(cmd, id));
 }
 
-//doesn't delete finished jobs. will need to add this feature after doing backround jobs.
+//doesn't delete finished jobs. will need to add this feature after doing background jobs.
 void JobsList::printJobsList(){
     for(JobEntry j : jobs)
         std::cout << "[" << j.get_id() << "] " << j.get_cmd()->get_cmd_line() <<std::endl;
@@ -348,10 +354,15 @@ void GetCurrDirCommand::execute(){
 void ExternalCommand::execute() { //will always be the son
     char** args = this->make_args(this->get_cmd_line());
     if(!isComplex(args)) { //should not have *,? and & because of make_args
-        if(args[0] != nullptr) {
-            execvp(args[0], args); //should leave automatically
-            perror("smash error: execvp failed"); // there is no command like that/no fitting flags
-        }
+        execvp(args[0], args); //should leave automatically
+        perror("smash error: execvp failed"); // there is no command like that/no fitting flags
+    }
+    else { //complex, using bash
+        char* copy_cmd_line = strdup(this->get_cmd_line());
+        _removeBackgroundSign(copy_cmd_line);
+        char* bash_args[] = {(char*)("/bin/bash"),(char*)("-c"), copy_cmd_line, nullptr};
+        execv("/bin/bash", bash_args); //shouldn't return
+        perror("smash error: execv failed");
     }
 }
 
