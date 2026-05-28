@@ -221,17 +221,12 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     else if(firstWord.compare("jobs") == 0){
         return new JobsCommand(cmd_line, this->jobs);
     }
-    /*
     else if (firstWord.compare("showpid") == 0) {
       return new ShowPidCommand(cmd_line);
     }
     else if (firstWord.compare("cd") == 0) {
         return new ChangeDirCommand(cmd_line, nullptr);
     }
-    /*
-    else if ...
-    .....
-    */
     else {
         if(bg) {
             return new ExternalCommand(cmd_line, true);
