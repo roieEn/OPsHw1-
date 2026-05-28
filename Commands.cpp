@@ -169,7 +169,7 @@ void SmallShell::executeCommand(const char *cmd_line) {
     Command* cmd = CreateCommand(cmd_line);
     if(ExternalCommand* extCmd = dynamic_cast<ExternalCommand*>(cmd)) {//if succeeds then cmd is external
         const pid_t p = fork();
-        if(p > 0) {
+        if(p > 0) { //parent
             if(!extCmd->is_bg) {
                 wait(NULL);
             }
@@ -177,7 +177,8 @@ void SmallShell::executeCommand(const char *cmd_line) {
                   this->AddToJobList(extCmd, false); //not sure what isStopped should be, when is it ever true and we want to add it?
             }
         }
-        else {
+        else { //child
+            setpgrp();
             cmd->execute();
         }
     }
