@@ -82,8 +82,9 @@ SmallShell::SmallShell() {
     strcpy(og_name, string("smash").c_str());
     curr_name = (char*) malloc(string(og_name).length() + 1);
     strcpy(curr_name, og_name);
-    in_recover = -1;
+    err_recover = -1;
     out_recover = -1;
+    in_recover = -1;
 }
 
 SmallShell::~SmallShell() {
@@ -128,10 +129,6 @@ void SmallShell::PrintAliases(){
     }
 }
 
-void SmallShell::RedirectIn(std::string in_path){
-    //TODO
-}
-
 void SmallShell::RedirectOut(std::string out_path, options option){
     char* p = getcwd(NULL, 0);
     if(p == NULL){
@@ -160,14 +157,61 @@ void SmallShell::RedirectOut(std::string out_path, options option){
     close(fd);
 }
 
+void SmallShell::PipeOut(int fd, pipe_out out){
+    if(out == SmallShell::out){
+        this->out_recover = dup(out);
+        if(this->out_recover == -1){
+            const char *problem = "smash error: dup failed\n";
+            write(2, problem, strlen(problem));
+            throw runtime_error("open failed");
+        }
+    }
+    else{
+        this->err_recover = dup(out);
+        if(this->err_recover == -1){
+            const char *problem = "smash error: dup failed\n";
+            write(2, problem, strlen(problem));
+            throw runtime_error("open failed");
+        }
+    }
+    int check = dup2(fd, out);
+    if(check == -1){
+        const char *problem = "smash error: dup2 failed\n";
+        write(2, problem, strlen(problem));
+        throw runtime_error("open failed");
+    }
+}
+
+void SmallShell::PipeIn(int fd){
+    this->in_recover = dup(0);
+    if(this->out_recover == -1){
+        const char *problem = "smash error: dup failed\n";
+        write(2, problem, strlen(problem));
+        throw runtime_error("open failed");
+    }
+    int check = dup2(fd, 0);
+    if(check == -1){
+        const char *problem = "smash error: dup2 failed\n";
+        write(2, problem, strlen(problem));
+        throw runtime_error("open failed");
+    }
+}
+
 void SmallShell::RecoverIO(){
-    if(in_recover != -1){
-        dup2(in_recover, 0);
-        close(in_recover);
+    if(err_recover != -1){
+        dup2(err_recover, 2);
+        close(err_recover);
+        err_recover = -1;
     }
     if(out_recover != -1){
         dup2(out_recover, 1);
         close(out_recover);
+        out_recover = -1;
+    }
+    if(in_recover != -1){
+        dup2(in_recover, 0);
+        close(in_recover);
+        in_recover = -1;
     }
 }
 
@@ -195,6 +239,15 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     if(regex_match(cmd_s.c_str(), redirect_parts, redidect_pattern)){
         return new RedirectionCommand(string(redirect_parts[1]).c_str(), 
             string(redirect_parts[3]), string(redirect_parts[2]));
+    }
+
+    //pipe command
+    std::regex pipe_pattern = regex("^(.+)\\s*(\\| | \\|\\&)\\s*(.+)\\s*$");
+    cmatch pipe_parts;
+    if(regex_match(cmd_s.c_str(), pipe_parts, pipe_pattern)){
+        return new PipeCommand(pipe_parts[0].str().c_str(), 
+            pipe_parts[1].str().c_str(), pipe_parts[2].str().c_str(), 
+            pipe_parts[3].str().c_str());
     }
 
     if(firstWord.compare("chprompt") == 0){
@@ -412,4 +465,145 @@ void RedirectionCommand::execute(){
     cmd->execute();
     delete cmd;
     s.RecoverIO();
+}
+
+PipeCommand::PipeCommand(const char *cmd_line, const char *cmd1, const char *op, const char *cmd2) : 
+    Command(cmd_line)
+{
+    this->cmd1 = (char*) malloc(sizeof(char)*(strlen(cmd1)+1));
+    strcpy(this->cmd1, cmd1);
+    this->op = (char*) malloc(sizeof(char)*(strlen(op)+1));
+    strcpy(this->op, op);
+    this->cmd2 = (char*) malloc(sizeof(char)*(strlen(cmd2)+1));
+    strcpy(this->cmd1, cmd2);
+}
+
+PipeCommand::~PipeCommand(){
+    free(cmd1); free(op); free(cmd2);
+}
+
+void PipeCommand::execute(){
+    int fd = strcmp(this->op, "|") ? 1 : 2;
+    SmallShell &s = SmallShell::getInstance();
+    Command *left = s.CreateCommand(this->cmd1);
+    Command *right = s.CreateCommand(this->cmd2);
+
+    ExternalCommand *e_right = dynamic_cast<ExternalCommand*>(right);
+    ExternalCommand *e_left = dynamic_cast<ExternalCommand*>(left);
+
+    int pipe_fd[2];
+    if(pipe(pipe_fd) == -1){
+        const char *problem = "smash error: pipe failed\n";
+        write(2, problem, strlen(problem));
+        free(right); free(left);
+        return;
+    }
+
+    if(e_right != nullptr && e_left != nullptr){
+        int fork_left = fork();
+        if(fork_left == -1){
+            const char *problem = "smash error: fork failed\n";
+            write(2, problem, strlen(problem));
+            free(right); free(left);
+            close(pipe_fd[0]); close(pipe_fd[1]);
+            return;
+        }
+        else if(fork_left == 0){
+            setpgrp();
+            dup2(pipe_fd[1], fd);
+            close(pipe_fd[0]); close(pipe_fd[1]);
+            right->execute();
+        }
+        int fork_right = fork();
+        if(fork_right == -1){
+            const char *problem = "smash error: fork failed\n";
+            write(2, problem, strlen(problem));
+            free(right); free(left);
+            close(pipe_fd[0]); close(pipe_fd[1]);
+            kill(fork_left, 9); waitpid(fork_left, NULL, 0);
+            return;
+        }
+        if(fork_right == 0){
+            setpgrp();
+            dup2(pipe_fd[0], 0);
+            close(pipe_fd[0]); close(pipe_fd[1]);
+            left->execute();
+        }
+        close(pipe_fd[0]); close(pipe_fd[1]);
+        waitpid(fork_left, NULL, 0);
+        waitpid(fork_right, NULL, 0);
+    }
+
+    else if(e_right != nullptr){
+        int fork_right = fork();
+        if(fork_right < 0){
+            const char *problem = "smash error: fork failed\n";
+            write(2, problem, strlen(problem));
+            free(right); free(left);
+            close(pipe_fd[0]); close(pipe_fd[1]);
+            return;
+        }
+        else if(fork_right == 0){
+            setpgrp();
+            dup2(pipe_fd[0], 0);
+            close(pipe_fd[0]); close(pipe_fd[1]);
+            right->execute();
+        }
+        else{
+            try{
+                s.PipeOut(pipe_fd[1], SmallShell::pipe_out(fd));
+            }
+            catch(runtime_error &e){
+                free(right); free(left);
+                close(pipe_fd[0]); close(pipe_fd[1]);
+                kill(fork_right, 9); waitpid(fork_right, NULL, 0);
+                return;
+            }
+            close(pipe_fd[0]); close(pipe_fd[1]);
+            left->execute();
+            s.RecoverIO();
+            waitpid(fork_right, NULL, 0);
+        }
+    }
+    
+    else if(e_left != nullptr){
+        int fork_left = fork();
+        if(fork_left < 0){
+            const char *problem = "smash error: fork failed\n";
+            write(2, problem, strlen(problem));
+            free(right); free(left);
+            close(pipe_fd[0]); close(pipe_fd[1]);
+            return;
+        }
+        else if(fork_left == 0){
+            setpgrp();
+            dup2(pipe_fd[1], fd);
+            close(pipe_fd[0]); close(pipe_fd[1]);
+            left->execute();
+        }
+        else{
+            try{
+                s.PipeIn(pipe_fd[0]);
+            }
+            catch(runtime_error &e){
+                free(right); free(left);
+                close(pipe_fd[0]); close(pipe_fd[1]);
+                kill(fork_left, 9); waitpid(fork_left, NULL, 0);
+                return;
+            }
+            close(pipe_fd[0]); close(pipe_fd[1]);
+            right->execute();
+            s.RecoverIO();
+            waitpid(fork_left, NULL, 0);
+        }
+    }
+     
+    //not piping for built-in commands. risk of deadlock (isn't there a video game with taht name?)
+    else{
+        close(pipe_fd[0]); close(pipe_fd[1]);
+        left->execute();
+        right->execute();
+    }
+
+    free(right); free(left);
 }

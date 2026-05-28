@@ -61,11 +61,13 @@ public:
 };
 
 class PipeCommand : public Command {
+    char *cmd1;
+    char *op;
+    char *cmd2;
 public:
-    PipeCommand(const char *cmd_line);
+    PipeCommand(const char *cmd_line, const char *cmd1, const char *op, const char *cmd2);
 
-    virtual ~PipeCommand() {
-    }
+    virtual ~PipeCommand();
 
     void execute() override;
 };
@@ -265,8 +267,9 @@ private:
 
     char* og_name;
     char* curr_name;
-    int in_recover;
+    int err_recover;
     int out_recover;
+    int in_recover;
 
     std::map<std::string, std::string> aliases;
     std::vector<std::string> alias_list;
@@ -299,11 +302,15 @@ public:
 
     void PrintAliases();
 
-    void RedirectIn(std::string in_path);
-
     enum options {append, no_append};
 
     void RedirectOut(std::string out_path, options option = no_append);
+
+    enum pipe_out {out = 1, err = 2};
+
+    void PipeOut(int fd, pipe_out out);
+
+    void PipeIn(int fd);
 
     void RecoverIO();
 };
