@@ -176,7 +176,6 @@ void SmallShell::RecoverIO(){
 */
 Command *SmallShell::CreateCommand(const char *cmd_line) {
     
-
     string cmd_s = _trim(string(cmd_line));
     string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
 
@@ -202,6 +201,9 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     }
     else if (firstWord.compare("pwd") == 0) {
       return new GetCurrDirCommand(cmd_line);
+    }
+    else if (firstWord.compare("sysinfo") == 0) {
+        return new SysInfoCommand(cmd_line);
     }
     else if(firstWord.compare("alias") == 0){
         return new AliasCommand(cmd_line);
@@ -461,4 +463,56 @@ void ChangeDirCommand::execute() {
         *this->pold_dir = current_dir;
     }
     this->free_args(args);
+}
+
+
+void SysInfoCommand::execute() {
+    std::string keys[5] = {"System", "Hostname", "Kernel", "Architecture", "Boot Time"};
+    std::string values[5];
+    values[3] = "x86_64\n";
+    std::string suffixes[3] = {"ostype","hostname","osrelease"};
+    std::string kernel_path = "/proc/sys/kernel/";
+    std::string paths[4];
+    for(int i = 0; i < 3; i++) {
+        paths[i] = kernel_path + suffixes[i];
+    }
+    paths[3] = "/proc/stat";
+    for(int i = 0; i < 4; i++) {
+        char buffer[4096];
+        int fd = open((paths[i]).c_str(), O_RDONLY);
+        if(fd == -1) {
+            perror("smash error: open failed");
+            return;
+        }
+        int bytes_read = read(fd, buffer, sizeof(buffer)-1);
+        if(bytes_read == -1) {
+            perror("smash error: read failed");
+            close(fd);
+            return;
+        }
+        buffer[bytes_read] = '\0';
+        if(i != 3)
+            values[i] = buffer;
+        else {
+            time_t boot_time = 0;
+            char *btime_ptr = strstr(buffer, "btime");
+            if (btime_ptr != nullptr) {
+                sscanf(btime_ptr, "btime %ld", &boot_time);
+            }
+            if (boot_time > 0) {
+                struct tm *time_info = localtime(&boot_time);
+                char time_string[64];
+                strftime(time_string, sizeof(time_string), "%Y-%m-%d %H:%M:%S", time_info);
+                values[4] = std::string(time_string) + '\n';
+            }
+        }
+        close(fd);
+    }
+    std::string ret = "";
+    for(int i = 0;i < 5;i++) {
+        ret += (keys[i] + ": " + values[i]);
+    }
+    write(1,ret.c_str(), ret.length());
+
+
 }
