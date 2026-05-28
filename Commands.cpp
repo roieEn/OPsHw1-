@@ -190,11 +190,11 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     catch(std::out_of_range& e){}
 
     //redirection command
-    std::regex pattern(R"(^(.*?)\s*(>>|>)\s*([a-z0-9./_-]+)\s*&?\s*$)");
-    cmatch parts;
-    if(regex_match(cmd_s.c_str(), parts, pattern)){
-        return new RedirectionCommand(string(parts[1]).c_str(), 
-            string(parts[3]), string(parts[2]));
+    std::regex redidect_pattern = regex("^(.*?)\\s*(>>|>)\\s*([a-z0-9./_-]+)\\s*&?\\s*$");
+    cmatch redirect_parts;
+    if(regex_match(cmd_s.c_str(), redirect_parts, redidect_pattern)){
+        return new RedirectionCommand(string(redirect_parts[1]).c_str(), 
+            string(redirect_parts[3]), string(redirect_parts[2]));
     }
 
     if(firstWord.compare("chprompt") == 0){
