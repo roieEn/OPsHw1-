@@ -106,7 +106,6 @@ class ChangeDirCommand : public BuiltInCommand {
     char** pold_dir;
 public:
     ChangeDirCommand(const char *cmd_line, char **plastPwd) : BuiltInCommand(cmd_line), pold_dir(plastPwd){}
->>>>>>> showpid
     virtual ~ChangeDirCommand() {
     }
 
