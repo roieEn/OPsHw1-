@@ -269,6 +269,7 @@ private:
     int out_recover;
 
     std::map<std::string, std::string> aliases;
+    std::vector<std::string> alias_list;
     
     SmallShell();
 
@@ -296,7 +297,7 @@ public:
 
     void addAlias(const std::string alias, const std::string arg);
 
-    const std::string get_alias(std::string word);
+    void PrintAliases();
 
     void RedirectIn(std::string in_path);
 

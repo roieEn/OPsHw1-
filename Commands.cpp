@@ -120,14 +120,12 @@ bool SmallShell::isAliasTaken(std::string alias){
 void SmallShell::addAlias(const std::string alias, const string arg){
     if(this->isAliasTaken(alias)) throw std::invalid_argument("alias already in use");
     aliases[alias] = arg;
+    alias_list.push_back(alias+"=\'"+arg+"\'\n");
 }
 
-const string SmallShell::get_alias(string word){
-    try{
-        return aliases.at(word);
-    }
-    catch(std::out_of_range& e){
-        return "";
+void SmallShell::PrintAliases(){
+    for(const std::string &to_print : alias_list){
+        write(1, to_print.c_str(), to_print.length());
     }
 }
 
@@ -279,9 +277,16 @@ void AliasCommand::execute(){
     regex pattern = regex("^alias ([a-zA-Z0-9_]+)='([^']*)'$");
     std::cmatch parts;
     if(! std::regex_match(this->get_cmd_line(), parts, pattern)){
-        const char* problem = "smash error: alias: invalid alias format\n";
-        write(2, problem, strlen(problem));
-        return;
+        if(_trim(string(this->get_cmd_line())).compare("alias") == 0){
+            SmallShell &e = SmallShell::getInstance();
+            e.PrintAliases();
+            return;
+        }
+        else{
+            const char* problem = "smash error: alias: invalid alias format\n";
+            write(2, problem, strlen(problem));
+            return;
+        }
     }
 
     try{
