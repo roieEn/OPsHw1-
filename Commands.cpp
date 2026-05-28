@@ -274,6 +274,15 @@ void GetCurrDirCommand::execute(){
     free(path);
 }
 
+void ShowPidCommand::execute() {
+    const std::string smash_pid_str = "smash pid is " + std::to_string(getpid()) + "\n";
+    write(1,smash_pid_str.c_str(),smash_pid_str.length());
+}
+
+
+
+
+
 void AliasCommand::execute(){
     regex pattern = regex("^alias ([a-zA-Z0-9_]+)='([^']*)'$");
     std::cmatch parts;

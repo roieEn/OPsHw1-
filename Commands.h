@@ -102,9 +102,16 @@ public:
 };
 
 class ChangeDirCommand : public BuiltInCommand {
+<<<<<<< HEAD
     char** pold_dir;
 public:
     ChangeDirCommand(const char *cmd_line, char **plastPwd) : BuiltInCommand(cmd_line), pold_dir(plastPwd){}
+=======
+    // TODO: Add your data members
+    const char* old_pwd;
+public:
+    ChangeDirCommand(const char *cmd_line, char **plastPwd);
+>>>>>>> showpid
 
     virtual ~ChangeDirCommand() {
     }

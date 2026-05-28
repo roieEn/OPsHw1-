@@ -1,0 +1,4 @@
+/usr/bin/cmake -DCMAKE_BUILD_TYPE=Debug "-DCMAKE_CXX_FLAGS=-Wall -pedantic-errors -Werror" -G "CodeBlocks - Unix Makefiles" /tmp/OPsHw1-
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /tmp/OPsHw1-/cmake-build-debug-remote-host
