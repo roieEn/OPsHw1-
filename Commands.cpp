@@ -103,7 +103,6 @@ void SmallShell::ch_prompt(const char *name){
     }
 }
 
-
 const char* SmallShell::get_prompt(){
     return curr_name;
 }
@@ -126,6 +125,49 @@ void SmallShell::addAlias(const std::string alias, const string arg){
 void SmallShell::PrintAliases(){
     for(const std::string &to_print : alias_list){
         write(1, to_print.c_str(), to_print.length());
+    }
+}
+
+void SmallShell::RedirectIn(std::string in_path){
+    //TODO
+}
+
+void SmallShell::RedirectOut(std::string out_path, options option){
+    char* p = getcwd(NULL, 0);
+    if(p == NULL){
+        const char *problem = "smash error: getcwd failed\n";
+        write(2, problem, strlen(problem));
+        throw runtime_error(problem);
+    }
+    string path = string(p);
+    free(p);
+    path += ("/" + out_path);
+    this->out_recover = dup(1);
+    if(out_recover < 0){
+        const char *problem = "smash error: dup failed\n";
+        write(2, problem, strlen(problem));
+        this->out_recover = -1;
+        throw runtime_error(problem);
+    }
+    int fd = option == append ? open(path.c_str(), O_CREAT | O_APPEND | O_WRONLY, 0666) : 
+        open(path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0666);
+    if(fd < 0){
+        const char *problem = "smash error: open failed\n";
+        write(2, problem, strlen(problem));
+        throw runtime_error(problem);
+    }
+    dup2(fd, 1);
+    close(fd);
+}
+
+void SmallShell::RecoverIO(){
+    if(in_recover != -1){
+        dup2(in_recover, 0);
+        close(in_recover);
+    }
+    if(out_recover != -1){
+        dup2(out_recover, 1);
+        close(out_recover);
     }
 }
 
@@ -188,51 +230,6 @@ void SmallShell::executeCommand(const char *cmd_line) {
     delete cmd;
     // Please note that you must fork smash process for some commands (e.g., external commands....)
 }
-
-void SmallShell::RedirectIn(std::string in_path){
-    //TODO
-}
-
-void SmallShell::RedirectOut(std::string out_path, options option){
-    char* p = getcwd(NULL, 0);
-    if(p == NULL){
-        const char *problem = "smash error: getcwd failed\n";
-        write(2, problem, strlen(problem));
-        throw runtime_error(problem);
-    }
-    string path = string(p);
-    free(p);
-    path += ("/" + out_path);
-    this->out_recover = dup(1);
-    if(out_recover < 0){
-        const char *problem = "smash error: dup failed\n";
-        write(2, problem, strlen(problem));
-        this->out_recover = -1;
-        throw runtime_error(problem);
-    }
-    int fd = option == append ? open(path.c_str(), O_CREAT | O_APPEND | O_WRONLY, 0666) : 
-        open(path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0666);
-    if(fd < 0){
-        const char *problem = "smash error: open failed\n";
-        write(2, problem, strlen(problem));
-        throw runtime_error(problem);
-    }
-    dup2(fd, 1);
-    close(fd);
-}
-
-void SmallShell::RecoverIO(){
-    if(in_recover != -1){
-        dup2(in_recover, 0);
-        close(in_recover);
-    }
-    if(out_recover != -1){
-        dup2(out_recover, 1);
-        close(out_recover);
-    }
-}
-
-
 
 
 
