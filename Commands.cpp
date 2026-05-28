@@ -75,7 +75,18 @@ void _removeBackgroundSign(char *cmd_line) {
     cmd_line[str.find_last_not_of(WHITESPACE, idx) + 1] = 0;
 }
 
-// TODO: Add your implementation for classes in Commands.h 
+bool isComplex(char** args) {
+    if(args == nullptr)
+        return false;
+    for(int i = 0; args[i] != nullptr; i++) {
+        if(strchr(args[i],'*') != nullptr || strchr(args[i],'?') != nullptr) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// TODO: Add your implementation for classes in Commands.h
 
 SmallShell::SmallShell() {
     og_name = (char*) malloc(string("smash").length() + 1);
@@ -84,11 +95,13 @@ SmallShell::SmallShell() {
     strcpy(curr_name, og_name);
     in_recover = -1;
     out_recover = -1;
+    jobs = new JobsList();
 }
 
 SmallShell::~SmallShell() {
     free(og_name);
     free(curr_name);
+    delete jobs;
 }
 
 void SmallShell::ch_prompt(const char *name){
@@ -97,7 +110,7 @@ void SmallShell::ch_prompt(const char *name){
         curr_name = (char*) malloc(string(og_name).length() + 1);
         strcpy(curr_name, og_name);
     }
-    else {
+    else{
         curr_name = (char*) malloc(string(name).length() + 1);
         strcpy(curr_name, name);
     }
@@ -189,6 +202,11 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     
     string cmd_s = _trim(string(cmd_line));
     string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
+    bool bg = false;
+    std::string cmd = cmd_line;
+    if(_isBackgroundComamnd(cmd_line)) {
+        bg = true;
+    }
 
     //check for alias and replace if found
     try{
@@ -225,6 +243,9 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     else if(firstWord.compare("unsetenv") == 0){
         return new UnSetEnvCommand(cmd_line);
     }
+    else if(firstWord.compare("jobs") == 0){
+        return new JobsCommand(cmd_line, this->jobs);
+    }
     /*
     else if (firstWord.compare("showpid") == 0) {
       return new ShowPidCommand(cmd_line);
@@ -235,10 +256,15 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     /*
     else if ...
     .....
-    else {
-      return new ExternalCommand(cmd_line);
-    }
     */
+    else {
+        if(bg) {
+            return new ExternalCommand(cmd_line, true);
+        }
+        else {
+            return new ExternalCommand(cmd_line, false);
+        }
+    }
     return nullptr;
 }
 
@@ -248,10 +274,37 @@ void SmallShell::executeCommand(const char *cmd_line) {
     Command* cmd = CreateCommand(cmd_line);
     cmd->execute();
     delete cmd;
+    if(ExternalCommand* extCmd = dynamic_cast<ExternalCommand*>(cmd)) {//if succeeds then cmd is external
+        const pid_t p = fork();
+        if(p > 0) {
+            if(!extCmd->is_bg) {
+                wait(NULL);
+            }
+            else {
+
+            }
+        }
+        else {
+            cmd->execute();
+        }
+    }
+    else
+        cmd->execute();
     // Please note that you must fork smash process for some commands (e.g., external commands....)
 }
 
 
+
+void JobsList::addJob(Command* cmd, bool isStopped){
+    int id = jobs.size() == 0 ? 1 : jobs.front().get_id();
+    jobs.push_back(JobEntry(cmd, id));
+}
+
+//doesn't delete finished jobs. will need to add this feature after doing backround jobs.
+void JobsList::printJobsList(){
+    for(JobEntry j : jobs)
+        std::cout << "[" << j.get_id() << "] " << j.get_cmd()->get_cmd_line() <<std::endl;
+}
 
 Command::Command(const char* cmd_line){
     this->cmd_line = (char*) malloc(sizeof(char)*(string(cmd_line).length()+1));
@@ -264,7 +317,9 @@ Command::~Command(){
 
 char** Command::make_args(){
     char** args = (char**) malloc(sizeof(char*) * 20);
-    _parseCommandLine(this->cmd_line, args);
+    char* copy_cmd_line = strdup(cmd_line);
+    _removeBackgroundSign(copy_cmd_line);
+    _parseCommandLine(copy_cmd_line, args);
     return args;
 }
 
@@ -289,6 +344,22 @@ void GetCurrDirCommand::execute(){
     write(1, "\n", 1);
     free(path);
 }
+
+void ExternalCommand::execute() { //will always be the son
+    char** args = this->make_args(this->get_cmd_line());
+    if(!isComplex(args)) { //should not have *,? and & because of make_args
+        if(args[0] != nullptr) {
+            execvp(args[0], args); //should leave automatically
+            perror("smash error: execvp failed"); // there is no command like that/no fitting flags
+        }
+    }
+}
+
+
+void JobsCommand::execute(){
+    jobs->printJobsList();
+}
+
 
 void ShowPidCommand::execute() {
     const std::string smash_pid_str = "smash pid is " + std::to_string(getpid()) + "\n";
