@@ -26,6 +26,7 @@ public:
 
     char** make_args();
     void free_args(char** args);
+    int args_length(char **args);
 };
 
 class BuiltInCommand : public Command {
@@ -72,8 +73,17 @@ public:
 };
 
 class DiskUsageCommand : public Command {
+
+    struct linux_dirent {
+               unsigned long  d_ino;     /* Inode number */
+               unsigned long  d_off;     /* Not an offset; see below */
+               unsigned short d_reclen;  /* Length of this linux_dirent */
+               char           d_name[];  /* Filename (null-terminated) */
+           }; //deff didn't copy past from the manpage
+
+    int Rec(const char* path);
 public:
-    DiskUsageCommand(const char *cmd_line);
+    DiskUsageCommand(const char *cmd_line) : Command(cmd_line) {}
 
     virtual ~DiskUsageCommand() {
     }
