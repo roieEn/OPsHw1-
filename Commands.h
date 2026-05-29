@@ -136,7 +136,7 @@ public:
 
 class ShowPidCommand : public BuiltInCommand {
 public:
-    ShowPidCommand(const char *cmd_line);
+    ShowPidCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {}
 
     virtual ~ShowPidCommand() {
     }
@@ -265,7 +265,7 @@ public:
 
 class SysInfoCommand : public BuiltInCommand {
 public:
-    SysInfoCommand(const char *cmd_line);
+    SysInfoCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {}
 
     virtual ~SysInfoCommand() {
     }
@@ -314,7 +314,7 @@ public:
 
     void ch_prompt(const char *cmd_line = NULL);
 
-    void* AddToJobList(Command*, bool);
+    void AddToJobList(Command*, bool);
 
     const char* get_prompt();
 

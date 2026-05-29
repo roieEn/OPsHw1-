@@ -10,6 +10,7 @@
 #include "sys/syscall.h"
 #include <dirent.h>
 #include <sys/stat.h>
+#include <errno.h>
 
 using namespace std;
 
@@ -151,7 +152,33 @@ void SmallShell::removeAlias(const std::string& alias) {
     aliases.erase(alias);
 }
 
-
+void SmallShell::RedirectOut(std::string out_path, options option){
+    char* p = getcwd(NULL, 0);
+    if(p == NULL){
+        const char *problem = "smash error: getcwd failed\n";
+        write(2, problem, strlen(problem));
+        throw runtime_error(problem);
+    }
+    string path = string(p);
+    free(p);
+    path += ("/" + out_path);
+    this->out_recover = dup(1);
+    if(out_recover < 0){
+        const char *problem = "smash error: dup failed\n";
+        write(2, problem, strlen(problem));
+        this->out_recover = -1;
+        throw runtime_error(problem);
+    }
+    int fd = option == append ? open(path.c_str(), O_CREAT | O_APPEND | O_WRONLY, 0666) : 
+        open(path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0666);
+    if(fd < 0){
+        const char *problem = "smash error: open failed\n";
+        write(2, problem, strlen(problem));
+        throw runtime_error(problem);
+    }
+    dup2(fd, 1);
+    close(fd);
+}
 
 void SmallShell::PipeOut(int fd, pipe_out out){
     if(out == SmallShell::out){
@@ -180,7 +207,7 @@ void SmallShell::PipeOut(int fd, pipe_out out){
 
 void SmallShell::PipeIn(int fd){
     this->in_recover = dup(0);
-    if(this->out_recover == -1){
+    if(this->in_recover == -1){
         const char *problem = "smash error: dup failed\n";
         write(2, problem, strlen(problem));
         throw runtime_error("open failed");
@@ -211,7 +238,7 @@ void SmallShell::RecoverIO(){
     }
 }
 
-void *SmallShell::AddToJobList(Command* cmd, bool isStopped) {
+void SmallShell::AddToJobList(Command* cmd, bool isStopped) {
     this->jobs->addJob(cmd, isStopped);
 }
 
@@ -300,8 +327,6 @@ void SmallShell::executeCommand(const char *cmd_line) {
     // TODO: Add your implementation here
     // for example:
     Command* cmd = CreateCommand(cmd_line);
-    cmd->execute();
-    delete cmd;
     if(ExternalCommand* extCmd = dynamic_cast<ExternalCommand*>(cmd)) {//if succeeds then cmd is external
         const pid_t p = fork();
         if(p > 0) { //parent
@@ -319,7 +344,7 @@ void SmallShell::executeCommand(const char *cmd_line) {
     }
     else
         cmd->execute();
-    // Please note that you must fork smash process for some commands (e.g., external commands....)
+    delete cmd;
 }
 
 
@@ -727,8 +752,8 @@ PipeCommand::PipeCommand(const char *cmd_line, const char *cmd1, const char *op,
     this->op = (char*) malloc(sizeof(char)*(strlen(op)+1));
     strcpy(this->op, op);
     this->cmd2 = (char*) malloc(sizeof(char)*(strlen(cmd2)+1));
-    strcpy(this->cmd1, cmd2);
-}
+    strcpy(this->cmd2, cmd2);
+} 
 
 PipeCommand::~PipeCommand(){
     free(cmd1); free(op); free(cmd2);
@@ -764,7 +789,8 @@ void PipeCommand::execute(){
             setpgrp();
             dup2(pipe_fd[1], fd);
             close(pipe_fd[0]); close(pipe_fd[1]);
-            right->execute();
+            left->execute();
+            exit(1);
         }
         int fork_right = fork();
         if(fork_right == -1){
@@ -779,7 +805,8 @@ void PipeCommand::execute(){
             setpgrp();
             dup2(pipe_fd[0], 0);
             close(pipe_fd[0]); close(pipe_fd[1]);
-            left->execute();
+            right->execute();
+            exit(1);
         }
         close(pipe_fd[0]); close(pipe_fd[1]);
         waitpid(fork_left, NULL, 0);
