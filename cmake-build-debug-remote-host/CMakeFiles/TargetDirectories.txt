@@ -1,3 +1,0 @@
-/tmp/OPsHw1-/cmake-build-debug-remote-host/CMakeFiles/rebuild_cache.dir
-/tmp/OPsHw1-/cmake-build-debug-remote-host/CMakeFiles/skeleton_smash.dir
-/tmp/OPsHw1-/cmake-build-debug-remote-host/CMakeFiles/edit_cache.dir

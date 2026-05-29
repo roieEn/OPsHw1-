@@ -40,7 +40,7 @@ public:
 class ExternalCommand : public Command {
 public:
     bool is_bg;
-    ExternalCommand(const char *cmd_line, bool bg);
+    ExternalCommand(const char *cmd_line, bool bg) : Command(cmd_line), is_bg(false){}
 
     virtual ~ExternalCommand() {
     }

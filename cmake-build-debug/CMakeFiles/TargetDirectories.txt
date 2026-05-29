@@ -1,3 +1,0 @@
-C:/Users/user/University/operatingsystems/hw1/OPsHw1-/cmake-build-debug/CMakeFiles/skeleton_smash.dir
-C:/Users/user/University/operatingsystems/hw1/OPsHw1-/cmake-build-debug/CMakeFiles/edit_cache.dir
-C:/Users/user/University/operatingsystems/hw1/OPsHw1-/cmake-build-debug/CMakeFiles/rebuild_cache.dir
