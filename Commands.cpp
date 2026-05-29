@@ -8,6 +8,8 @@
 #include "Commands.h"
 #include <fcntl.h>
 #include "sys/syscall.h"
+#include <dirent.h>
+#include <sys/stat.h>
 
 using namespace std;
 
@@ -75,7 +77,18 @@ void _removeBackgroundSign(char *cmd_line) {
     cmd_line[str.find_last_not_of(WHITESPACE, idx) + 1] = 0;
 }
 
-// TODO: Add your implementation for classes in Commands.h 
+bool isComplex(char** args) {
+    if(args == nullptr)
+        return false;
+    for(int i = 0; args[i] != nullptr; i++) {
+        if(strchr(args[i],'*') != nullptr || strchr(args[i],'?') != nullptr) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// TODO: Add your implementation for classes in Commands.h
 
 SmallShell::SmallShell() {
     og_name = (char*) malloc(string("smash").length() + 1);
@@ -84,12 +97,14 @@ SmallShell::SmallShell() {
     strcpy(curr_name, og_name);
     err_recover = -1;
     out_recover = -1;
+    jobs = new JobsList();
     in_recover = -1;
 }
 
 SmallShell::~SmallShell() {
     free(og_name);
     free(curr_name);
+    delete jobs;
 }
 
 void SmallShell::ch_prompt(const char *name){
@@ -98,7 +113,7 @@ void SmallShell::ch_prompt(const char *name){
         curr_name = (char*) malloc(string(og_name).length() + 1);
         strcpy(curr_name, og_name);
     }
-    else {
+    else{
         curr_name = (char*) malloc(string(name).length() + 1);
         strcpy(curr_name, name);
     }
@@ -109,7 +124,7 @@ const char* SmallShell::get_prompt(){
 }
 
 bool SmallShell::isAliasTaken(std::string alias){
-    for(const std::string name : {"chprompt", "showpid", "pwd", "cd", "jobs", 
+    for(const std::string name : {"chprompt", "showpid", "pwd", "cd", "jobs",
         "fg", "quit", "kill", "alias", "unalias", "unsetenv", "sysinfo",
         "du", "whoami", "usbinfo"}) if(alias == name) return true;
 
@@ -117,7 +132,7 @@ bool SmallShell::isAliasTaken(std::string alias){
     return false;
 }
 
-void SmallShell::addAlias(const std::string alias, const string arg){
+void SmallShell::addAlias(const std::string& alias, const string& arg){
     if(this->isAliasTaken(alias)) throw std::invalid_argument("alias already in use");
     aliases[alias] = arg;
     alias_list.push_back(alias+"=\'"+arg+"\'\n");
@@ -129,33 +144,14 @@ void SmallShell::PrintAliases(){
     }
 }
 
-void SmallShell::RedirectOut(std::string out_path, options option){
-    char* p = getcwd(NULL, 0);
-    if(p == NULL){
-        const char *problem = "smash error: getcwd failed\n";
-        write(2, problem, strlen(problem));
-        throw runtime_error(problem);
+void SmallShell::removeAlias(const std::string& alias) {
+    if(!this->isAliasTaken(alias)) {
+        throw std::invalid_argument("no such alias in use");
     }
-    string path = string(p);
-    free(p);
-    path += ("/" + out_path);
-    this->out_recover = dup(1);
-    if(out_recover < 0){
-        const char *problem = "smash error: dup failed\n";
-        write(2, problem, strlen(problem));
-        this->out_recover = -1;
-        throw runtime_error(problem);
-    }
-    int fd = option == append ? open(path.c_str(), O_CREAT | O_APPEND | O_WRONLY, 0666) : 
-        open(path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0666);
-    if(fd < 0){
-        const char *problem = "smash error: open failed\n";
-        write(2, problem, strlen(problem));
-        throw runtime_error(problem);
-    }
-    dup2(fd, 1);
-    close(fd);
+    aliases.erase(alias);
 }
+
+
 
 void SmallShell::PipeOut(int fd, pipe_out out){
     if(out == SmallShell::out){
@@ -215,14 +211,23 @@ void SmallShell::RecoverIO(){
     }
 }
 
+void *SmallShell::AddToJobList(Command* cmd, bool isStopped) {
+    this->jobs->addJob(cmd, isStopped);
+}
+
+
 /**
 * Creates and returns a pointer to Command class which matches the given command line (cmd_line)
 */
 Command *SmallShell::CreateCommand(const char *cmd_line) {
     
-
     string cmd_s = _trim(string(cmd_line));
     string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
+    bool bg = false;
+    std::string cmd = cmd_line;
+    if(_isBackgroundComamnd(cmd_line)) {
+        bg = true;
+    }
 
     //check for alias and replace if found
     try{
@@ -237,7 +242,7 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     std::regex redidect_pattern = regex("^(.*?)\\s*(>>|>)\\s*([a-z0-9./_-]+)\\s*&?\\s*$");
     cmatch redirect_parts;
     if(regex_match(cmd_s.c_str(), redirect_parts, redidect_pattern)){
-        return new RedirectionCommand(string(redirect_parts[1]).c_str(), 
+        return new RedirectionCommand(string(redirect_parts[1]).c_str(),
             string(redirect_parts[3]), string(redirect_parts[2]));
     }
 
@@ -256,22 +261,38 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     else if (firstWord.compare("pwd") == 0) {
       return new GetCurrDirCommand(cmd_line);
     }
+    else if (firstWord.compare("sysinfo") == 0) {
+        return new SysInfoCommand(cmd_line);
+    }
     else if(firstWord.compare("alias") == 0){
         return new AliasCommand(cmd_line);
+    }
+    else if(firstWord.compare("unalias") == 0){
+        return new UnAliasCommand(cmd_line);
     }
     else if(firstWord.compare("unsetenv") == 0){
         return new UnSetEnvCommand(cmd_line);
     }
-    /*
+    else if(firstWord.compare("du") == 0){
+        return new DiskUsageCommand(cmd_line);
+    }
+    else if(firstWord.compare("jobs") == 0){
+        return new JobsCommand(cmd_line, this->jobs);
+    }
     else if (firstWord.compare("showpid") == 0) {
       return new ShowPidCommand(cmd_line);
     }
-    else if ...
-    .....
-    else {
-      return new ExternalCommand(cmd_line);
+    else if (firstWord.compare("cd") == 0) {
+        return new ChangeDirCommand(cmd_line, nullptr);
     }
-    */
+    else {
+        if(bg) {
+            return new ExternalCommand(cmd_line, true);
+        }
+        else {
+            return new ExternalCommand(cmd_line, false);
+        }
+    }
     return nullptr;
 }
 
@@ -281,10 +302,38 @@ void SmallShell::executeCommand(const char *cmd_line) {
     Command* cmd = CreateCommand(cmd_line);
     cmd->execute();
     delete cmd;
+    if(ExternalCommand* extCmd = dynamic_cast<ExternalCommand*>(cmd)) {//if succeeds then cmd is external
+        const pid_t p = fork();
+        if(p > 0) { //parent
+            if(!extCmd->is_bg) {
+                wait(NULL);
+            }
+            else {
+                  this->AddToJobList(extCmd, false); //not sure what isStopped should be, when is it ever true and we want to add it?
+            }
+        }
+        else { //child
+            setpgrp();
+            cmd->execute();
+        }
+    }
+    else
+        cmd->execute();
     // Please note that you must fork smash process for some commands (e.g., external commands....)
 }
 
 
+
+void JobsList::addJob(Command* cmd, bool isStopped){
+    int id = jobs.size() == 0 ? 1 : jobs.front().get_id(); //should be +1 ?
+    jobs.push_back(JobEntry(cmd, id));
+}
+
+//doesn't delete finished jobs. will need to add this feature after doing background jobs.
+void JobsList::printJobsList(){
+    for(JobEntry j : jobs)
+        std::cout << "[" << j.get_id() << "] " << j.get_cmd()->get_cmd_line() <<std::endl;
+}
 
 Command::Command(const char* cmd_line){
     this->cmd_line = (char*) malloc(sizeof(char)*(string(cmd_line).length()+1));
@@ -292,12 +341,14 @@ Command::Command(const char* cmd_line){
 }
 
 Command::~Command(){
-    free(this->cmd_line); 
+    free(this->cmd_line);
 }
 
 char** Command::make_args(){
     char** args = (char**) malloc(sizeof(char*) * 20);
-    _parseCommandLine(this->cmd_line, args);
+    char* copy_cmd_line = strdup(cmd_line);
+    _removeBackgroundSign(copy_cmd_line);
+    _parseCommandLine(copy_cmd_line, args);
     return args;
 }
 
@@ -305,6 +356,12 @@ void Command::free_args(char** args){
     for(int i = 0; args[i] != NULL; i++)
         free(args[i]);
     free(args);
+}
+
+int Command::args_length(char **args){
+    int i=0;
+    while(args[i]!=NULL) i++;
+    return i;
 }
 
 void ChPrompt::execute(){
@@ -322,6 +379,36 @@ void GetCurrDirCommand::execute(){
     write(1, "\n", 1);
     free(path);
 }
+
+void ExternalCommand::execute() { //will always be the son
+    char** args = this->make_args();
+    if(!isComplex(args)) { //should not have *,? and & because of make_args
+        execvp(args[0], args); //should leave automatically
+        perror("smash error: execvp failed"); // there is no command like that/no fitting flags
+    }
+    else { //complex, using bash
+        char* copy_cmd_line = strdup(this->get_cmd_line());
+        _removeBackgroundSign(copy_cmd_line);
+        char* bash_args[] = {(char*)("/bin/bash"),(char*)("-c"), copy_cmd_line, nullptr};
+        execv("/bin/bash", bash_args); //shouldn't return
+        perror("smash error: execv failed");
+    }
+}
+
+
+void JobsCommand::execute(){
+    jobs->printJobsList();
+}
+
+
+void ShowPidCommand::execute() {
+    const std::string smash_pid_str = "smash pid is " + std::to_string(getpid()) + "\n";
+    write(1,smash_pid_str.c_str(),smash_pid_str.length());
+}
+
+
+
+
 
 void AliasCommand::execute(){
     regex pattern = regex("^alias ([a-zA-Z0-9_]+)='([^']*)'$");
@@ -350,6 +437,30 @@ void AliasCommand::execute(){
         write(2, problem2, strlen(problem2));
     }
 }
+
+void UnAliasCommand::execute() {
+    char** args = this->make_args();
+    if(args[1] == nullptr) {
+        const char* problem = "smash error: unalias: not enough arguments\n";
+        write(2, problem, strlen(problem));
+        free_args(args);
+        return;
+    }
+    for(int i = 1; args[i] != nullptr; i++) {
+        try {
+            SmallShell& s = SmallShell::getInstance();
+            s.removeAlias(args[i]);
+        }
+        catch (std::invalid_argument& e) {
+            const std::string problem = "smash error: unalias: " + std::string(args[i]) + " alias does not exist\n";
+            write(2, problem.c_str(), problem.length());
+            free_args(args);
+            return;
+        }
+    }
+    this->free_args(args);
+}
+
 
 void UnSetEnvCommand::execute(){
     char** args = this->make_args();
@@ -414,7 +525,7 @@ vector<std::string>* UnSetEnvCommand::ReadEnv(std::string path){
         throw runtime_error(problem);
     }
     buff = temp;
-    int amount_read = 0; 
+    int amount_read = 0;
     const char* curr_place = buff;
     vector<std::string> *Env = new vector<std::string>;
     while(amount_read < realsize){
@@ -432,7 +543,7 @@ bool UnSetEnvCommand::ExistsInEnv(std::string arg, vector<std::string> *allvars)
     return false;
 }
 
-//arg surly exists in __environ. oterwise, undefined behavior may occur. 
+//arg surly exists in __environ. oterwise, undefined behavior may occur.
 void UnSetEnvCommand::DeleteVar(const char* arg){
     extern char** __environ;
     char **curr_place = __environ;
@@ -458,7 +569,7 @@ void UnSetEnvCommand::DeleteVar(const char* arg){
 
 void RedirectionCommand::execute(){
     SmallShell &s = SmallShell::getInstance();
-    SmallShell::options option = this->op.compare(">") == 0 ? 
+    SmallShell::options option = this->op.compare(">") == 0 ?
         SmallShell::no_append : SmallShell::append;
     s.RedirectOut(this->path, option);
     Command *cmd = s.CreateCommand(this->get_cmd_line());
@@ -466,6 +577,147 @@ void RedirectionCommand::execute(){
     delete cmd;
     s.RecoverIO();
 }
+
+void ChangeDirCommand::execute() {
+    char** args = this->make_args();
+    if (args[1] == nullptr) {
+        this->free_args(args);
+        return;
+    }
+    if(args[2] != nullptr) {
+        const std::string error_msg = "smash error: cd: too many arguments\n";
+        write(2, error_msg.c_str(), error_msg.length());
+        this->free_args(args);
+        return;
+    }
+    char* path = args[1];
+    if(strcmp(path, "-") == 0) {
+        path = *this->pold_dir;
+        if(path == nullptr) {
+            const std::string error_msg = "smash error: cd: OLDPWD not set\n";
+            write(2, error_msg.c_str(), error_msg.length());
+            this->free_args(args);
+            return;
+        }
+    }
+    char* current_dir = getcwd(NULL, 0);
+    if(chdir(path) == -1) {
+        perror("smash error: chdir failed");
+        free(current_dir);
+    }
+    else {
+        if(*this->pold_dir != nullptr) {
+            free(*this->pold_dir);
+        }
+        *this->pold_dir = current_dir;
+    }
+    this->free_args(args);
+}
+
+
+void SysInfoCommand::execute() {
+    std::string keys[5] = {"System", "Hostname", "Kernel", "Architecture", "Boot Time"};
+    std::string values[5];
+    values[3] = "x86_64\n";
+    std::string suffixes[3] = {"ostype","hostname","osrelease"};
+    std::string kernel_path = "/proc/sys/kernel/";
+    std::string paths[4];
+    for(int i = 0; i < 3; i++) {
+        paths[i] = kernel_path + suffixes[i];
+    }
+    paths[3] = "/proc/stat";
+    for(int i = 0; i < 4; i++) {
+        char buffer[4096];
+        int fd = open((paths[i]).c_str(), O_RDONLY);
+        if(fd == -1) {
+            perror("smash error: open failed");
+            return;
+        }
+        int bytes_read = read(fd, buffer, sizeof(buffer)-1);
+        if(bytes_read == -1) {
+            perror("smash error: read failed");
+            close(fd);
+            return;
+        }
+        buffer[bytes_read] = '\0';
+        if(i != 3)
+            values[i] = buffer;
+        else {
+            time_t boot_time = 0;
+            char *btime_ptr = strstr(buffer, "btime");
+            if (btime_ptr != nullptr) {
+                sscanf(btime_ptr, "btime %ld", &boot_time);
+            }
+            if (boot_time > 0) {
+                struct tm *time_info = localtime(&boot_time);
+                char time_string[64];
+                strftime(time_string, sizeof(time_string), "%Y-%m-%d %H:%M:%S", time_info);
+                values[4] = std::string(time_string) + '\n';
+            }
+        }
+        close(fd);
+    }
+    std::string ret = "";
+    for(int i = 0;i < 5;i++) {
+        ret += (keys[i] + ": " + values[i]);
+    }
+    write(1,ret.c_str(), ret.length());
+
+
+}
+
+
+void DiskUsageCommand::execute(){
+    char **args = this->make_args();
+    if(args_length(args) > 2){
+        const char *problem = "smash error: du: too many arguments\n";
+        write(2, problem, strlen(problem));
+        free_args(args);
+        return;
+    }
+    char *p = getcwd(NULL, 0);
+    std::string path = args[1] != NULL ? string(args[1]) : string(p);
+    free(p);
+
+    int wight = Rec(path.c_str()), rem = wight%1024;
+    wight = (wight/1024) + (rem >= 512 ? 1 : 0); 
+    std::string ans = "Total disk usage: " + std::to_string(wight) + " KB\n";
+    write(1, ans.c_str(), ans.length());
+}
+
+int DiskUsageCommand::Rec(const char* path){
+    int fd = open(path, O_RDONLY | O_DIRECTORY), sum = 0;
+    if(fd < 0){
+        const char *problem = "smash error: open failed";
+        write(2, problem, strlen(problem));
+        throw runtime_error("open failed");
+    }
+    std::vector<std::string> paths_vec;
+    char buff[1024];
+    int nread = 2;
+    while(nread != 0){
+        nread = syscall(SYS_getdents, fd, buff,  1024);
+        for (int bpos = 0; bpos < nread;){
+            struct linux_dirent *d = (struct linux_dirent *) (buff + bpos);
+            struct stat st;
+            string curr = string(path) + "/" + string(d->d_name);
+            lstat(curr.c_str(), &st);
+            sum+=st.st_size;
+            char d_type = *(buff + bpos + d->d_reclen - 1); //donno, took from man page
+            if(d_type == DT_DIR && strcmp(d->d_name, ".") != 0 
+                && strcmp(d->d_name, "..") != 0){
+                    paths_vec.push_back(curr);
+                }
+            bpos += d->d_reclen;
+        }
+    }
+    close(fd);
+    for(std::string str : paths_vec)
+        sum+=Rec(str.c_str());
+    return sum;
+}
+
+
 
 PipeCommand::PipeCommand(const char *cmd_line, const char *cmd1, const char *op, const char *cmd2) : 
     Command(cmd_line)
