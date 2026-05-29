@@ -8,6 +8,8 @@
 #include "Commands.h"
 #include <fcntl.h>
 #include "sys/syscall.h"
+#include <dirent.h>
+#include <sys/stat.h>
 
 using namespace std;
 
@@ -209,6 +211,9 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     else if(firstWord.compare("unsetenv") == 0){
         return new UnSetEnvCommand(cmd_line);
     }
+    else if(firstWord.compare("du") == 0){
+        return new DiskUsageCommand(cmd_line);
+    }
     /*
     else if (firstWord.compare("showpid") == 0) {
       return new ShowPidCommand(cmd_line);
@@ -252,6 +257,12 @@ void Command::free_args(char** args){
     for(int i = 0; args[i] != NULL; i++)
         free(args[i]);
     free(args);
+}
+
+int Command::args_length(char **args){
+    int i=0;
+    while(args[i]!=NULL) i++;
+    return i;
 }
 
 void ChPrompt::execute(){
@@ -413,3 +424,54 @@ void RedirectionCommand::execute(){
     delete cmd;
     s.RecoverIO();
 }
+
+void DiskUsageCommand::execute(){
+    char **args = this->make_args();
+    if(args_length(args) > 2){
+        const char *problem = "smash error: du: too many arguments\n";
+        write(2, problem, strlen(problem));
+        free_args(args);
+        return;
+    }
+    char *p = getcwd(NULL, 0);
+    std::string path = args[1] != NULL ? string(args[1]) : string(p);
+    free(p);
+
+    int wight = Rec(path.c_str()), rem = wight%1024;
+    wight = (wight/1024) + (rem >= 512 ? 1 : 0); 
+    std::string ans = "Total disk usage: " + std::to_string(wight) + " KB\n";
+    write(1, ans.c_str(), ans.length());
+}
+
+int DiskUsageCommand::Rec(const char* path){
+    int fd = open(path, O_RDONLY | O_DIRECTORY), sum = 0;
+    if(fd < 0){
+        const char *problem = "smash error: open failed";
+        write(2, problem, strlen(problem));
+        throw runtime_error("open failed");
+    }
+    std::vector<std::string> paths_vec;
+    char buff[1024];
+    int nread = 2;
+    while(nread != 0){
+        nread = syscall(SYS_getdents, fd, buff,  1024);
+        for (int bpos = 0; bpos < nread;){
+            struct linux_dirent *d = (struct linux_dirent *) (buff + bpos);
+            struct stat st;
+            string curr = string(path) + "/" + string(d->d_name);
+            lstat(curr.c_str(), &st);
+            sum+=st.st_size;
+            char d_type = *(buff + bpos + d->d_reclen - 1); //donno, took from man page
+            if(d_type == DT_DIR && strcmp(d->d_name, ".") != 0 
+                && strcmp(d->d_name, "..") != 0){
+                    paths_vec.push_back(curr);
+                }
+            bpos += d->d_reclen;
+        }
+    }
+    close(fd);
+    for(std::string str : paths_vec)
+        sum+=Rec(str.c_str());
+    return sum;
+}
+
