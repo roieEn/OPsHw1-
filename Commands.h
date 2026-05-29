@@ -39,7 +39,8 @@ public:
 
 class ExternalCommand : public Command {
 public:
-    ExternalCommand(const char *cmd_line);
+    bool is_bg;
+    ExternalCommand(const char *cmd_line, bool bg);
 
     virtual ~ExternalCommand() {
     }
@@ -52,7 +53,7 @@ class RedirectionCommand : public Command {
     std::string path;
     std::string op;
 public:
-    explicit RedirectionCommand(const char *cmd_line, std::string path, std::string op) : 
+    explicit RedirectionCommand(const char *cmd_line, std::string path, std::string op) :
         Command(cmd_line), path(path), op(op) {}
 
     virtual ~RedirectionCommand() {
@@ -112,9 +113,9 @@ public:
 };
 
 class ChangeDirCommand : public BuiltInCommand {
-    // TODO: Add your data members public:
-    ChangeDirCommand(const char *cmd_line, char **plastPwd);
-
+    char** pold_dir;
+public:
+    ChangeDirCommand(const char *cmd_line, char **plastPwd) : BuiltInCommand(cmd_line), pold_dir(plastPwd){}
     virtual ~ChangeDirCommand() {
     }
 
@@ -156,14 +157,23 @@ class QuitCommand : public BuiltInCommand {
 class JobsList {
 public:
     class JobEntry {
-        // TODO: Add your data members
+        Command* cmd;
+        int id;
+
+        public:
+
+            JobEntry(Command* cmd, int id) : cmd(cmd), id(id) {}
+            ~JobEntry() = default;
+
+            int get_id() {return id;}
+            Command* get_cmd() {return cmd;}
     };
 
-    // TODO: Add your data members
+    std::vector<JobEntry> jobs;
 public:
-    JobsList();
+    JobsList() = default;
 
-    ~JobsList();
+    ~JobsList() = default;
 
     void addJob(Command *cmd, bool isStopped = false);
 
@@ -185,9 +195,10 @@ public:
 };
 
 class JobsCommand : public BuiltInCommand {
-    // TODO: Add your data members
+    JobsList* jobs;
 public:
-    JobsCommand(const char *cmd_line, JobsList *jobs);
+    JobsCommand(const char *cmd_line, JobsList *jobs) :
+        BuiltInCommand(cmd_line), jobs(jobs) {}
 
     virtual ~JobsCommand() {
     }
@@ -229,7 +240,7 @@ public:
 
 class UnAliasCommand : public BuiltInCommand {
 public:
-    UnAliasCommand(const char *cmd_line);
+    UnAliasCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {}
 
     virtual ~UnAliasCommand() {
     }
@@ -280,7 +291,10 @@ private:
 
     std::map<std::string, std::string> aliases;
     std::vector<std::string> alias_list;
-    
+
+
+    JobsList* jobs;
+
     SmallShell();
 
 public:
@@ -297,6 +311,8 @@ public:
 
     void ch_prompt(const char *cmd_line = NULL);
 
+    void* AddToJobList(Command*, bool);
+
     const char* get_prompt();
 
     ~SmallShell();
@@ -305,7 +321,9 @@ public:
 
     bool isAliasTaken(const std::string alias);
 
-    void addAlias(const std::string alias, const std::string arg);
+    void addAlias(const std::string& alias, const std::string& arg);
+
+    void removeAlias(const std::string& alias);
 
     void PrintAliases();
 
