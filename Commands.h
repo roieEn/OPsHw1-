@@ -40,12 +40,16 @@ public:
 class ExternalCommand : public Command {
 public:
     bool is_bg;
-    ExternalCommand(const char *cmd_line, bool bg) : Command(cmd_line), is_bg(bg){}
+    std::string og_line;
+    ExternalCommand(const char *cmd_line, bool bg, std::string og_line) : Command(cmd_line), 
+        is_bg(bg), og_line(og_line){}
 
     virtual ~ExternalCommand() {
     }
 
     void execute() override;
+
+    std::string GetOgLine(){return og_line;}
 };
 
 
@@ -147,8 +151,10 @@ public:
 class JobsList;
 
 class QuitCommand : public BuiltInCommand {
-    // TODO: Add your data members public:
-    QuitCommand(const char *cmd_line, JobsList *jobs);
+    JobsList *jobs;
+
+    public:
+    QuitCommand(const char *cmd_line, JobsList *jobs) : BuiltInCommand(cmd_line), jobs(jobs){}
 
     virtual ~QuitCommand() {
     }
@@ -193,10 +199,7 @@ public:
 
     void RemoveJobByPid(int pid);
 
-    JobEntry *getLastJob(int *lastJobId);
-
-    JobEntry *getLastStoppedJob(int *jobId);
-
+    int GetSize();
     // TODO: Add extra methods or modify exisitng ones as needed
 };
 

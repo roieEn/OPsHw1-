@@ -258,19 +258,21 @@ void SmallShell::Zakka(){
 * Creates and returns a pointer to Command class which matches the given command line (cmd_line)
 */
 Command *SmallShell::CreateCommand(const char *cmd_line) {
-    
+    string og_line = cmd_line;
     string cmd_s = _trim(string(cmd_line));
     string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
-    std::string cmd = cmd_line;
-
+    bool bg = _isBackgroundComamnd(cmd_line);
     //check for alias and replace if found
     try{
+        if(firstWord.find_first_of("&") != std::string::npos)
+            firstWord = firstWord.substr(0, firstWord.find_first_of("&"));
         string alias = aliases.at(firstWord);
-        cmd_s.replace(0, cmd_s.find_first_of(" \n"), alias);
+        cmd_s.replace(0, firstWord.length(), alias);
         firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
         cmd_line = cmd_s.c_str();
     }
     catch(std::out_of_range& e){}
+
 
     //redirection command
     std::regex redidect_pattern = regex("^(.*?)\\s*(>>|>)\\s*([a-z0-9./_-]+)\\s*&?\\s*$");
@@ -319,8 +321,11 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     else if (firstWord.compare("cd") == 0) {
         return new ChangeDirCommand(cmd_line, nullptr);
     }
+    else if(firstWord.compare("quit") == 0){
+        return new QuitCommand(cmd_line, jobs);
+    }
     else {
-        return new ExternalCommand(cmd_line, _isBackgroundComamnd(cmd_line));
+        return new ExternalCommand(cmd_line, bg, og_line);
     }
     return nullptr;
 }
@@ -364,7 +369,9 @@ void JobsList::addJob(Command* cmd, bool isStopped, int pid){
 //doesn't delete finished jobs. will need to add this feature after doing background jobs.
 void JobsList::printJobsList(){
     for(JobEntry j : jobs){
-        string out = "[" + std::to_string(j.get_id()) + "] " + j.get_cmd()->get_cmd_line()+"\n";
+        ExternalCommand *ej = dynamic_cast<ExternalCommand*>(j.get_cmd());
+        string out = "[" + std::to_string(j.get_id()) + "] " 
+            + ej->GetOgLine() +"\n";
         write(1, out.c_str(), out.length());
     }
 }
@@ -376,6 +383,21 @@ void JobsList::RemoveJobByPid(int pid){
             return;
         }
 }
+
+void JobsList::killAllJobs(){
+    for(JobEntry j : jobs){
+        ExternalCommand *je = dynamic_cast<ExternalCommand*>(j.get_cmd());
+        string mssg = std::to_string(j.get_pid()) + ": " +
+            je->GetOgLine() + "\n";
+        write(1, mssg.c_str(), mssg.length());
+    }
+    jobs.clear();
+}
+
+int JobsList::GetSize() {return jobs.size();}
+
+
+
 
 Command::Command(const char* cmd_line){
     this->cmd_line = (char*) malloc(sizeof(char)*(string(cmd_line).length()+1));
@@ -434,6 +456,7 @@ void ExternalCommand::execute() { //will always be the son
         char* bash_args[] = {(char*)("/bin/bash"),(char*)("-c"), copy_cmd_line, nullptr};
         execv("/bin/bash", bash_args); //shouldn't return
         perror("smash error: execv failed");
+        exit(1);
     }
 }
 
@@ -595,6 +618,19 @@ void UnSetEnvCommand::DeleteVar(const char* arg){
         *temp = *curr_place;
     }
 }
+
+void QuitCommand::execute(){
+    char **args = make_args();
+    if(args[1] != NULL && strcmp("kill", args[1]) == 0){
+        string mssg = "smash: sending SIGKILL signal to " 
+             + std::to_string(jobs->GetSize()) + " jobs:\n";
+        write(1, mssg.c_str(), mssg.length());
+        jobs->killAllJobs();
+    }
+    exit(0);
+}
+
+
 
 void RedirectionCommand::execute(){
     SmallShell &s = SmallShell::getInstance();
