@@ -379,6 +379,7 @@ void JobsList::printJobsList(){
 void JobsList::RemoveJobByPid(int pid){
     for(auto itr = this->jobs.begin(); itr != this->jobs.end(); itr++)
         if(itr->get_pid() == pid) {
+            delete itr->get_cmd();
             jobs.erase(itr);
             return;
         }
@@ -390,6 +391,7 @@ void JobsList::killAllJobs(){
         string mssg = std::to_string(j.get_pid()) + ": " +
             je->GetOgLine() + "\n";
         write(1, mssg.c_str(), mssg.length());
+        delete je;
     }
     jobs.clear();
 }
