@@ -40,7 +40,7 @@ public:
 class ExternalCommand : public Command {
 public:
     bool is_bg;
-    ExternalCommand(const char *cmd_line, bool bg) : Command(cmd_line), is_bg(false){}
+    ExternalCommand(const char *cmd_line, bool bg) : Command(cmd_line), is_bg(bg){}
 
     virtual ~ExternalCommand() {
     }
@@ -161,14 +161,16 @@ public:
     class JobEntry {
         Command* cmd;
         int id;
+        int pid;
 
         public:
 
-            JobEntry(Command* cmd, int id) : cmd(cmd), id(id) {}
+            JobEntry(Command* cmd, int id, int pid) : cmd(cmd), id(id), pid(pid) {}
             ~JobEntry() = default;
 
             int get_id() {return id;}
             Command* get_cmd() {return cmd;}
+            int get_pid() {return pid;}
     };
 
     std::vector<JobEntry> jobs;
@@ -177,7 +179,7 @@ public:
 
     ~JobsList() = default;
 
-    void addJob(Command *cmd, bool isStopped = false);
+    void addJob(Command *cmd, bool isStopped, int pid);
 
     void printJobsList();
 
@@ -188,6 +190,8 @@ public:
     JobEntry *getJobById(int jobId);
 
     void removeJobById(int jobId);
+
+    void RemoveJobByPid(int pid);
 
     JobEntry *getLastJob(int *lastJobId);
 
@@ -314,7 +318,7 @@ public:
 
     void ch_prompt(const char *cmd_line = NULL);
 
-    void AddToJobList(Command*, bool);
+    void AddToJobList(Command*, bool, int pid);
 
     const char* get_prompt();
 
@@ -341,6 +345,8 @@ public:
     void PipeIn(int fd);
 
     void RecoverIO();
+
+    void Zakka(); 
 };
 
 #endif //SMASH_COMMAND_H_

@@ -238,9 +238,20 @@ void SmallShell::RecoverIO(){
     }
 }
 
-void SmallShell::AddToJobList(Command* cmd, bool isStopped) {
-    this->jobs->addJob(cmd, isStopped);
+void SmallShell::AddToJobList(Command* cmd, bool isStopped, int pid) {
+    this->Zakka();
+    this->jobs->addJob(cmd, isStopped, pid);
 }
+
+void SmallShell::Zakka(){
+    int pid;
+    do{
+        pid = waitpid(-1, NULL, WNOHANG);
+        if(pid > 0) this->jobs->RemoveJobByPid(pid);
+    }
+    while(pid > 0);
+}
+
 
 
 /**
@@ -250,11 +261,7 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     
     string cmd_s = _trim(string(cmd_line));
     string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
-    bool bg = false;
     std::string cmd = cmd_line;
-    if(_isBackgroundComamnd(cmd_line)) {
-        bg = true;
-    }
 
     //check for alias and replace if found
     try{
@@ -313,12 +320,7 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
         return new ChangeDirCommand(cmd_line, nullptr);
     }
     else {
-        if(bg) {
-            return new ExternalCommand(cmd_line, true);
-        }
-        else {
-            return new ExternalCommand(cmd_line, false);
-        }
+        return new ExternalCommand(cmd_line, _isBackgroundComamnd(cmd_line));
     }
     return nullptr;
 }
@@ -326,15 +328,17 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
 void SmallShell::executeCommand(const char *cmd_line) {
     // TODO: Add your implementation here
     // for example:
+    this->Zakka();
     Command* cmd = CreateCommand(cmd_line);
     if(ExternalCommand* extCmd = dynamic_cast<ExternalCommand*>(cmd)) {//if succeeds then cmd is external
         const pid_t p = fork();
         if(p > 0) { //parent
             if(!extCmd->is_bg) {
-                wait(NULL);
+                waitpid(p, NULL, 0);
+                delete cmd;
             }
             else {
-                  this->AddToJobList(extCmd, false); //not sure what isStopped should be, when is it ever true and we want to add it?
+                  this->AddToJobList(extCmd, false, p); //not sure what isStopped should be, when is it ever true and we want to add it?
             }
         }
         else { //child
@@ -342,22 +346,35 @@ void SmallShell::executeCommand(const char *cmd_line) {
             cmd->execute();
         }
     }
-    else
+    else{
         cmd->execute();
-    delete cmd;
+        delete cmd;
+    }
 }
 
 
 
-void JobsList::addJob(Command* cmd, bool isStopped){
-    int id = jobs.size() == 0 ? 1 : jobs.front().get_id(); //should be +1 ?
-    jobs.push_back(JobEntry(cmd, id));
+
+
+void JobsList::addJob(Command* cmd, bool isStopped, int pid){
+    int id = jobs.size() == 0 ? 1 : jobs.back().get_id()+1;
+    jobs.push_back(JobEntry(cmd, id, pid));
 }
 
 //doesn't delete finished jobs. will need to add this feature after doing background jobs.
 void JobsList::printJobsList(){
-    for(JobEntry j : jobs)
-        std::cout << "[" << j.get_id() << "] " << j.get_cmd()->get_cmd_line() <<std::endl;
+    for(JobEntry j : jobs){
+        string out = "[" + std::to_string(j.get_id()) + "] " + j.get_cmd()->get_cmd_line()+"\n";
+        write(1, out.c_str(), out.length());
+    }
+}
+
+void JobsList::RemoveJobByPid(int pid){
+    for(auto itr = this->jobs.begin(); itr != this->jobs.end(); itr++)
+        if(itr->get_pid() == pid) {
+            jobs.erase(itr);
+            return;
+        }
 }
 
 Command::Command(const char* cmd_line){
@@ -420,20 +437,16 @@ void ExternalCommand::execute() { //will always be the son
     }
 }
 
-
 void JobsCommand::execute(){
+    SmallShell &s = SmallShell::getInstance();
+    s.Zakka();
     jobs->printJobsList();
 }
-
 
 void ShowPidCommand::execute() {
     const std::string smash_pid_str = "smash pid is " + std::to_string(getpid()) + "\n";
     write(1,smash_pid_str.c_str(),smash_pid_str.length());
 }
-
-
-
-
 
 void AliasCommand::execute(){
     regex pattern = regex("^alias ([a-zA-Z0-9_]+)='([^']*)'$");
@@ -485,7 +498,6 @@ void UnAliasCommand::execute() {
     }
     this->free_args(args);
 }
-
 
 void UnSetEnvCommand::execute(){
     char** args = this->make_args();
@@ -572,10 +584,6 @@ bool UnSetEnvCommand::ExistsInEnv(std::string arg, vector<std::string> *allvars)
 void UnSetEnvCommand::DeleteVar(const char* arg){
     extern char** __environ;
     char **curr_place = __environ;
-    std::cout << "before" << std::endl;
-    {
-        for(char **temp = __environ; *temp != NULL; temp++) std::cout << *temp << endl;
-    }
     while(true){
         if(string(*curr_place).find(string(arg) + "=") == 0) {
             break;
@@ -585,10 +593,6 @@ void UnSetEnvCommand::DeleteVar(const char* arg){
     while(*curr_place != NULL) {
         char **temp = curr_place++;
         *temp = *curr_place;
-    }
-    std::cout << "after" << std::endl;
-    {
-        for(char **temp = __environ; *temp != NULL; temp++) std::cout << *temp << endl;
     }
 }
 
@@ -638,7 +642,6 @@ void ChangeDirCommand::execute() {
     }
     this->free_args(args);
 }
-
 
 void SysInfoCommand::execute() {
     std::string keys[5] = {"System", "Hostname", "Kernel", "Architecture", "Boot Time"};
@@ -691,7 +694,6 @@ void SysInfoCommand::execute() {
 
 }
 
-
 void DiskUsageCommand::execute(){
     char **args = this->make_args();
     if(args_length(args) > 2){
@@ -741,8 +743,6 @@ int DiskUsageCommand::Rec(const char* path){
         sum+=Rec(str.c_str());
     return sum;
 }
-
-
 
 PipeCommand::PipeCommand(const char *cmd_line, const char *cmd1, const char *op, const char *cmd2) : 
     Command(cmd_line)
