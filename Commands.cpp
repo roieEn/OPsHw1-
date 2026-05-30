@@ -264,10 +264,10 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     bool bg = _isBackgroundComamnd(cmd_line);
     //check for alias and replace if found
     try{
-        if(firstWord.find_first_of("&") != std::string::npos)
-            firstWord = firstWord.substr(0, firstWord.find_first_of("&"));
+        firstWord = firstWord.substr(0, firstWord.find_first_of("&|>"));
         string alias = aliases.at(firstWord);
         cmd_s.replace(0, firstWord.length(), alias);
+        cmd_s = _trim(cmd_s);
         firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
         cmd_line = cmd_s.c_str();
     }
@@ -639,9 +639,7 @@ void RedirectionCommand::execute(){
     SmallShell::options option = this->op.compare(">") == 0 ?
         SmallShell::no_append : SmallShell::append;
     s.RedirectOut(this->path, option);
-    Command *cmd = s.CreateCommand(this->get_cmd_line());
-    cmd->execute();
-    delete cmd;
+    s.executeCommand(this->get_cmd_line());
     s.RecoverIO();
 }
 
