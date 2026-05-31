@@ -2,8 +2,10 @@
 #ifndef SMASH_COMMAND_H_
 #define SMASH_COMMAND_H_
 
+#include <utility>
 #include <vector>
 #include <map>
+#include <set>
 #include <string.h>
 
 #define COMMAND_MAX_LENGTH (200)
@@ -42,7 +44,7 @@ public:
     bool is_bg;
     std::string og_line;
     ExternalCommand(const char *cmd_line, bool bg, std::string og_line) : Command(cmd_line), 
-        is_bg(bg), og_line(og_line){}
+        is_bg(bg), og_line(std::move(og_line)){}
 
     virtual ~ExternalCommand() {
     }
@@ -180,6 +182,8 @@ public:
     };
 
     std::vector<JobEntry> jobs;
+
+    std::set<int> job_ids;
 public:
     JobsList() = default;
 
@@ -227,9 +231,9 @@ public:
 };
 
 class ForegroundCommand : public BuiltInCommand {
-    // TODO: Add your data members
+    JobsList* jobs;
 public:
-    ForegroundCommand(const char *cmd_line, JobsList *jobs);
+    ForegroundCommand(const char *cmd_line, JobsList *jobs) : BuiltInCommand(cmd_line), jobs(jobs) {}
 
     virtual ~ForegroundCommand() {
     }
@@ -298,6 +302,7 @@ private:
     int err_recover;
     int out_recover;
     int in_recover;
+    int curr_pid;
 
     std::map<std::string, std::string> aliases;
     std::vector<std::string> alias_list;
@@ -349,7 +354,9 @@ public:
 
     void RecoverIO();
 
-    void Zakka(); 
+    void Zakka();
+
+    void setPid(int pid_num);
 };
 
 #endif //SMASH_COMMAND_H_

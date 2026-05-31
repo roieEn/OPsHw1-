@@ -246,11 +246,17 @@ void SmallShell::AddToJobList(Command* cmd, bool isStopped, int pid) {
 void SmallShell::Zakka(){
     int pid;
     do{
+        this->setPid(-1);
         pid = waitpid(-1, NULL, WNOHANG);
         if(pid > 0) this->jobs->RemoveJobByPid(pid);
     }
     while(pid > 0);
 }
+
+void SmallShell::setPid(int pid_num) {
+    this->curr_pid = pid_num;
+}
+
 
 
 
@@ -324,6 +330,9 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     else if(firstWord.compare("quit") == 0){
         return new QuitCommand(cmd_line, jobs);
     }
+    else if(firstWord.compare("fg") == 0) {
+        return new ForegroundCommand(cmd_line, this->jobs);
+    }
     else {
         return new ExternalCommand(cmd_line, bg, og_line);
     }
@@ -339,7 +348,9 @@ void SmallShell::executeCommand(const char *cmd_line) {
         const pid_t p = fork();
         if(p > 0) { //parent
             if(!extCmd->is_bg) {
+                this->setPid(p);
                 waitpid(p, NULL, 0);
+                this->setPid(-1);
                 delete cmd;
             }
             else {
@@ -364,6 +375,7 @@ void SmallShell::executeCommand(const char *cmd_line) {
 void JobsList::addJob(Command* cmd, bool isStopped, int pid){
     int id = jobs.size() == 0 ? 1 : jobs.back().get_id()+1;
     jobs.push_back(JobEntry(cmd, id, pid));
+    job_ids.insert(id);
 }
 
 //doesn't delete finished jobs. will need to add this feature after doing background jobs.
@@ -380,6 +392,7 @@ void JobsList::RemoveJobByPid(int pid){
     for(auto itr = this->jobs.begin(); itr != this->jobs.end(); itr++)
         if(itr->get_pid() == pid) {
             delete itr->get_cmd();
+            job_ids.erase(itr->get_id());
             jobs.erase(itr);
             return;
         }
@@ -451,6 +464,7 @@ void ExternalCommand::execute() { //will always be the son
     if(!isComplex(args)) { //should not have *,? and & because of make_args
         execvp(args[0], args); //should leave automatically
         perror("smash error: execvp failed"); // there is no command like that/no fitting flags
+        this->free_args(args);
     }
     else { //complex, using bash
         char* copy_cmd_line = strdup(this->get_cmd_line());
@@ -458,6 +472,7 @@ void ExternalCommand::execute() { //will always be the son
         char* bash_args[] = {(char*)("/bin/bash"),(char*)("-c"), copy_cmd_line, nullptr};
         execv("/bin/bash", bash_args); //shouldn't return
         perror("smash error: execv failed");
+        this->free_args(args);
         exit(1);
     }
 }
@@ -834,7 +849,10 @@ void PipeCommand::execute(){
             write(2, problem, strlen(problem));
             free(right); free(left);
             close(pipe_fd[0]); close(pipe_fd[1]);
-            kill(fork_left, 9); waitpid(fork_left, NULL, 0);
+            s.setPid(fork_left);
+            kill(fork_left, 9);
+            waitpid(fork_left, NULL, 0);
+            s.setPid(-1);
             return;
         }
         if(fork_right == 0){
@@ -845,8 +863,12 @@ void PipeCommand::execute(){
             exit(1);
         }
         close(pipe_fd[0]); close(pipe_fd[1]);
+        s.setPid(fork_left);
         waitpid(fork_left, NULL, 0);
+        s.setPid(-1);
+        s.setPid(fork_right);
         waitpid(fork_right, NULL, 0);
+        s.setPid(-1);
     }
 
     else if(e_right != nullptr){
@@ -871,13 +893,18 @@ void PipeCommand::execute(){
             catch(runtime_error &e){
                 free(right); free(left);
                 close(pipe_fd[0]); close(pipe_fd[1]);
-                kill(fork_right, 9); waitpid(fork_right, NULL, 0);
+                s.setPid(fork_right);
+                kill(fork_right, 9);
+                waitpid(fork_right, NULL, 0);
+                s.setPid(-1);
                 return;
             }
             close(pipe_fd[0]); close(pipe_fd[1]);
             left->execute();
             s.RecoverIO();
+            s.setPid(fork_right);
             waitpid(fork_right, NULL, 0);
+            s.setPid(-1);
         }
     }
     
@@ -903,13 +930,17 @@ void PipeCommand::execute(){
             catch(runtime_error &e){
                 free(right); free(left);
                 close(pipe_fd[0]); close(pipe_fd[1]);
+                s.setPid(fork_left);
                 kill(fork_left, 9); waitpid(fork_left, NULL, 0);
+                s.setPid(-1);
                 return;
             }
             close(pipe_fd[0]); close(pipe_fd[1]);
             right->execute();
             s.RecoverIO();
+            s.setPid(fork_left);
             waitpid(fork_left, NULL, 0);
+            s.setPid(-1);
         }
     }
      
@@ -921,4 +952,74 @@ void PipeCommand::execute(){
     }
 
     free(right); free(left);
+}
+
+bool isDigit(const char c) {
+    return c >= '0' && c <= '9';
+}
+
+int parseNum(const char* numString, int size) { //assuming natural numbers (including zero)
+    int ret = 0;
+    for(int i = 0; i < size; i++) {
+        if(!isDigit(numString[i])) {
+            if(numString[i] == '\0') {
+                return ret;
+            }
+            return -1; //if reached then numString[i] isn't a digit and isn't end of string
+        }
+        ret *= 10;
+        ret += numString[i] - '0';
+    }
+    return ret;
+}
+
+void ForegroundCommand::execute() {
+    char** args = this->make_args();
+    int id;
+    if(args[2] != nullptr) { //more than one argument given
+        const char *problem = "smash error: fg: invalid arguments\n";
+        write(2, problem, strlen(problem));
+        this->free_args(args);
+        return;
+        // throw runtime_error(problem);
+    }
+    if (args[1] == nullptr) { //no job id specified
+        if(this->jobs->GetSize() == 0) {
+            const char *problem = "smash error: fg: jobs list is empty\n";
+            write(2, problem, strlen(problem));
+            this->free_args(args);
+            return;
+            // throw runtime_error(problem);
+        }
+        id = this->jobs->jobs.back().get_id(); //we need the last actual job
+    }
+    else {
+        const char* arg = args[1]; //should be an "int" like "87"
+        id = parseNum(args[1], strlen(args[1]));
+        if(id == -1) {
+            const string problem_str = "smash error: fg: invalid arguments\n";
+            write(2, problem_str.c_str(), strlen(problem_str.c_str()));
+            this->free_args(args);
+            return;
+        }
+        if (this->jobs->job_ids.find(id) == this->jobs->job_ids.end()) {
+            const string problem_str = "smash error: fg: job-id " + to_string(id) +" does not exist\n";
+            write(2, problem_str.c_str(), strlen(problem_str.c_str()));
+            this->free_args(args);
+            return;
+        }
+    }
+    //if reached, id holds the correct JobId to bring forward
+    JobsList::JobEntry* job_entry = this->jobs->getJobById(id);
+    int job_pid = job_entry->get_pid();
+    const string print_str = std::string(job_entry->get_cmd()->get_cmd_line()) + " " + to_string(job_pid) + "\n";
+    write(1, print_str.c_str(), strlen(print_str.c_str()));
+    SmallShell& smash = SmallShell::getInstance();
+    smash.setPid(job_pid);
+    kill(job_pid, SIGCONT); //will be created along with the kill smash command
+    waitpid(job_pid, NULL, 0);
+    this->jobs->RemoveJobByPid(job_pid);
+    smash.setPid(-1);
+    this->free_args(args);
+
 }
