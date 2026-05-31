@@ -406,6 +406,7 @@ void JobsList::killAllJobs(){
             je->GetOgLine() + "\n";
         write(1, mssg.c_str(), mssg.length());
         kill(j.get_pid(), SIGKILL);
+        waitpid(j.get_pid(), NULL, 0);
         delete je;
     }
     jobs.clear();

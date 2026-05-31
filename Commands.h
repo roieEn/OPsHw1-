@@ -357,6 +357,8 @@ public:
     void Zakka();
 
     void setPid(int pid_num);
+
+    int getPid() {return curr_pid;}
 };
 
 #endif //SMASH_COMMAND_H_
