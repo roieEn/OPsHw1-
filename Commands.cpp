@@ -156,7 +156,7 @@ void SmallShell::RedirectOut(std::string out_path, options option){
     char* p = getcwd(NULL, 0);
     if(p == NULL){
         const char *problem = "smash error: getcwd failed\n";
-        write(2, problem, strlen(problem));
+        perror(problem);
         throw runtime_error(problem);
     }
     string path = string(p);
@@ -165,7 +165,7 @@ void SmallShell::RedirectOut(std::string out_path, options option){
     this->out_recover = dup(1);
     if(out_recover < 0){
         const char *problem = "smash error: dup failed\n";
-        write(2, problem, strlen(problem));
+        perror(problem);
         this->out_recover = -1;
         throw runtime_error(problem);
     }
@@ -173,7 +173,7 @@ void SmallShell::RedirectOut(std::string out_path, options option){
         open(path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0666);
     if(fd < 0){
         const char *problem = "smash error: open failed\n";
-        write(2, problem, strlen(problem));
+        perror(problem);
         throw runtime_error(problem);
     }
     dup2(fd, 1);
@@ -185,7 +185,7 @@ void SmallShell::PipeOut(int fd, pipe_out out){
         this->out_recover = dup(out);
         if(this->out_recover == -1){
             const char *problem = "smash error: dup failed\n";
-            write(2, problem, strlen(problem));
+            perror(problem);
             throw runtime_error("open failed");
         }
     }
@@ -193,14 +193,14 @@ void SmallShell::PipeOut(int fd, pipe_out out){
         this->err_recover = dup(out);
         if(this->err_recover == -1){
             const char *problem = "smash error: dup failed\n";
-            write(2, problem, strlen(problem));
+            perror(problem);
             throw runtime_error("open failed");
         }
     }
     int check = dup2(fd, out);
     if(check == -1){
         const char *problem = "smash error: dup2 failed\n";
-        write(2, problem, strlen(problem));
+        perror(problem);
         throw runtime_error("open failed");
     }
 }
@@ -209,13 +209,13 @@ void SmallShell::PipeIn(int fd){
     this->in_recover = dup(0);
     if(this->in_recover == -1){
         const char *problem = "smash error: dup failed\n";
-        write(2, problem, strlen(problem));
+        perror(problem);
         throw runtime_error("open failed");
     }
     int check = dup2(fd, 0);
     if(check == -1){
         const char *problem = "smash error: dup2 failed\n";
-        write(2, problem, strlen(problem));
+        perror(problem);
         throw runtime_error("open failed");
     }
 }
@@ -343,7 +343,8 @@ void SmallShell::executeCommand(const char *cmd_line) {
                 delete cmd;
             }
             else {
-                  this->AddToJobList(extCmd, false, p); //not sure what isStopped should be, when is it ever true and we want to add it?
+                    this->Zakka();
+                    this->AddToJobList(extCmd, false, p); //not sure what isStopped should be, when is it ever true and we want to add it?
             }
         }
         else { //child
@@ -391,6 +392,7 @@ void JobsList::killAllJobs(){
         string mssg = std::to_string(j.get_pid()) + ": " +
             je->GetOgLine() + "\n";
         write(1, mssg.c_str(), mssg.length());
+        kill(j.get_pid(), SIGKILL);
         delete je;
     }
     jobs.clear();
@@ -557,7 +559,7 @@ vector<std::string>* UnSetEnvCommand::ReadEnv(std::string path){
     int fd = open(path.c_str(), O_RDONLY);
     if(fd < 0) {
         const char* problem = "smash error: open failed";
-        write(2, problem, strlen(problem));
+        perror(problem);
         close(fd);
         throw std::runtime_error(problem);
     }
@@ -570,7 +572,7 @@ vector<std::string>* UnSetEnvCommand::ReadEnv(std::string path){
         char* temp = (char*) realloc(buff, ((size+=1024)*sizeof(char)));
         if(temp == NULL){
                 const char* problem = "smash error: realloc failed\n";
-                write(2, problem, strlen(problem));
+                perror(problem);
                 free(buff);
                 close(fd);
                 throw runtime_error(problem);
@@ -581,7 +583,7 @@ vector<std::string>* UnSetEnvCommand::ReadEnv(std::string path){
     char* temp = (char*) realloc(buff, (realsize)*sizeof(char));
     if(temp == NULL){
         const char* problem = "smash error: realloc failed\n";
-        write(2, problem, strlen(problem));
+        perror(problem);
         free(buff);
         close(fd);
         throw runtime_error(problem);
@@ -638,7 +640,10 @@ void RedirectionCommand::execute(){
     SmallShell &s = SmallShell::getInstance();
     SmallShell::options option = this->op.compare(">") == 0 ?
         SmallShell::no_append : SmallShell::append;
-    s.RedirectOut(this->path, option);
+    try{
+        s.RedirectOut(this->path, option);
+    }
+    catch(runtime_error &r) {return;}
     s.executeCommand(this->get_cmd_line());
     s.RecoverIO();
 }
@@ -752,7 +757,7 @@ int DiskUsageCommand::Rec(const char* path){
     int fd = open(path, O_RDONLY | O_DIRECTORY), sum = 0;
     if(fd < 0){
         const char *problem = "smash error: open failed";
-        write(2, problem, strlen(problem));
+        perror(problem);
         throw runtime_error("open failed");
     }
     std::vector<std::string> paths_vec;
@@ -807,7 +812,7 @@ void PipeCommand::execute(){
     int pipe_fd[2];
     if(pipe(pipe_fd) == -1){
         const char *problem = "smash error: pipe failed\n";
-        write(2, problem, strlen(problem));
+        perror(problem);
         free(right); free(left);
         return;
     }
@@ -816,7 +821,7 @@ void PipeCommand::execute(){
         int fork_left = fork();
         if(fork_left == -1){
             const char *problem = "smash error: fork failed\n";
-            write(2, problem, strlen(problem));
+            perror(problem);
             free(right); free(left);
             close(pipe_fd[0]); close(pipe_fd[1]);
             return;
@@ -831,7 +836,7 @@ void PipeCommand::execute(){
         int fork_right = fork();
         if(fork_right == -1){
             const char *problem = "smash error: fork failed\n";
-            write(2, problem, strlen(problem));
+            perror(problem);
             free(right); free(left);
             close(pipe_fd[0]); close(pipe_fd[1]);
             kill(fork_left, 9); waitpid(fork_left, NULL, 0);
@@ -853,7 +858,7 @@ void PipeCommand::execute(){
         int fork_right = fork();
         if(fork_right < 0){
             const char *problem = "smash error: fork failed\n";
-            write(2, problem, strlen(problem));
+            perror(problem);
             free(right); free(left);
             close(pipe_fd[0]); close(pipe_fd[1]);
             return;
@@ -885,7 +890,7 @@ void PipeCommand::execute(){
         int fork_left = fork();
         if(fork_left < 0){
             const char *problem = "smash error: fork failed\n";
-            write(2, problem, strlen(problem));
+            perror(problem);
             free(right); free(left);
             close(pipe_fd[0]); close(pipe_fd[1]);
             return;
