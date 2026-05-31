@@ -222,7 +222,7 @@ public:
 class KillCommand : public BuiltInCommand {
     JobsList* jobs;
 public:
-    KillCommand(const char *cmd_line, JobsList *jobs);
+    KillCommand(const char *cmd_line, JobsList *jobs) : BuiltInCommand(cmd_line), jobs(jobs){}
 
     virtual ~KillCommand() {
     }

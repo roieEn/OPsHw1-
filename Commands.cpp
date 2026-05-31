@@ -417,6 +417,15 @@ void JobsList::killAllJobs(){
 
 int JobsList::GetSize() {return jobs.size();}
 
+JobsList::JobEntry* JobsList::getJobById(int id){
+    for(JobEntry j : jobs)
+        if(j.get_id() == id) {
+            JobEntry *jp = &j;
+            return jp;
+        }
+    return nullptr;
+}
+
 
 
 
@@ -1003,7 +1012,7 @@ void ForegroundCommand::execute() {
         id = this->jobs->jobs.back().get_id(); //we need the last actual job
     }
     else {
-        const char* arg = args[1]; //should be an "int" like "87"
+        //const char* arg = args[1]; //should be an "int" like "87"
         id = parseNum(args[1], strlen(args[1]));
         if(id == -1) {
             const string problem_str = "smash error: fg: invalid arguments\n";
