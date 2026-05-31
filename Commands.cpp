@@ -333,6 +333,9 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     else if(firstWord.compare("fg") == 0) {
         return new ForegroundCommand(cmd_line, this->jobs);
     }
+    else if(firstWord.compare("kill") == 0) {
+        return new KillCommand(cmd_line, this->jobs);
+    }
     else {
         return new ExternalCommand(cmd_line, bg, og_line);
     }
@@ -1023,3 +1026,44 @@ void ForegroundCommand::execute() {
     this->free_args(args);
 
 }
+
+void KillCommand::execute() {
+    char** args = this->make_args();
+    if(args[1] == nullptr || args[2] == nullptr || args[3] != nullptr || args[1][0] != '-') {
+        const char *problem = "smash error: kill: invalid arguments\n";
+        write(2, problem, strlen(problem));
+        this->free_args(args);
+        return;
+    }
+    const int signum = parseNum(args[1]+1, strlen(args[1] + 1)); //args[1][0] should be '-'
+    if(signum == -1) { //not a number
+        const string problem_str = "smash error: kill: invalid arguments\n";
+        write(2, problem_str.c_str(), strlen(problem_str.c_str()));
+        this->free_args(args);
+        return;
+    }
+    int id = parseNum(args[2], strlen(args[2]));
+    if(id == -1) { //not a number
+        const string problem_str = "smash error: kill: invalid arguments\n";
+        write(2, problem_str.c_str(), strlen(problem_str.c_str()));
+        this->free_args(args);
+        return;
+    }
+    if (this->jobs->job_ids.find(id) == this->jobs->job_ids.end()) {
+        const string problem_str = "smash error: kill: job-id " + to_string(id) +" does not exist\n";
+        write(2, problem_str.c_str(), strlen(problem_str.c_str()));
+        this->free_args(args);
+        return;
+    }
+    JobsList::JobEntry* job_entry = this->jobs->getJobById(id); //if reached then id is a valid jobId
+    int job_pid = job_entry->get_pid();
+    const string message = "signal number " + to_string(signum) + " was sent to pid " + to_string(job_pid) + "\n";
+    if(kill(job_pid, signum) == -1) {
+        perror("smash error: kill failed");
+    }
+    else
+        write(1, message.c_str(), strlen(message.c_str()));
+
+    this->free_args(args);
+}
+
