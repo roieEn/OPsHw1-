@@ -101,7 +101,7 @@ public:
 
 class WhoAmICommand : public Command {
 public:
-    WhoAmICommand(const char *cmd_line);
+    WhoAmICommand(const char *cmd_line) : Command(cmd_line){}
 
     virtual ~WhoAmICommand() {
     }
@@ -262,10 +262,10 @@ public:
 };
 
 class UnSetEnvCommand : public BuiltInCommand {
-    std::vector<std::string>* ReadEnv(std::string path);
     bool ExistsInEnv(std::string arg, std::vector<std::string> *allvars);
     void DeleteVar(const char* arg);
 public:
+    static std::vector<std::string>* ReadEnv(std::string path);
     UnSetEnvCommand(const char *cmd_line) : BuiltInCommand(cmd_line){}
 
     virtual ~UnSetEnvCommand() {

@@ -336,6 +336,9 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     else if(firstWord.compare("kill") == 0) {
         return new KillCommand(cmd_line, this->jobs);
     }
+    else if(firstWord.compare("whoami") == 0) {
+        return new WhoAmICommand(cmd_line);
+    }
     else {
         return new ExternalCommand(cmd_line, bg, og_line);
     }
@@ -629,6 +632,53 @@ vector<std::string>* UnSetEnvCommand::ReadEnv(std::string path){
     free(buff);
     return Env;
 }
+
+// vector<std::string>* WhoAmICommand::ReadEnv(std::string path){
+//     int fd = open(path.c_str(), O_RDONLY);
+//     if(fd < 0) {
+//         const char* problem = "smash error: open failed";
+//         perror(problem);
+//         close(fd);
+//         throw std::runtime_error(problem);
+//     }
+//     int size = 1024, realsize = 0;
+//     char *buff = (char*) malloc(sizeof(char)*1024), *place = buff;
+//     while(1){
+//         int amount = read(fd, place, 1024);
+//         realsize += amount;
+//         if(amount < 1024) break;
+//         char* temp = (char*) realloc(buff, ((size+=1024)*sizeof(char)));
+//         if(temp == NULL){
+//             const char* problem = "smash error: realloc failed\n";
+//             perror(problem);
+//             free(buff);
+//             close(fd);
+//             throw runtime_error(problem);
+//         }
+//         buff = temp;
+//         place = buff + realsize;
+//     }
+//     char* temp = (char*) realloc(buff, (realsize)*sizeof(char));
+//     if(temp == NULL){
+//         const char* problem = "smash error: realloc failed\n";
+//         perror(problem);
+//         free(buff);
+//         close(fd);
+//         throw runtime_error(problem);
+//     }
+//     buff = temp;
+//     int amount_read = 0;
+//     const char* curr_place = buff;
+//     vector<std::string> *Env = new vector<std::string>;
+//     while(amount_read < realsize){
+//         Env->push_back(string(curr_place));
+//         amount_read += (strlen(curr_place) + 1);
+//         curr_place += (strlen(curr_place) + 1);
+//     }
+//     close(fd);
+//     free(buff);
+//     return Env;
+// }
 
 bool UnSetEnvCommand::ExistsInEnv(std::string arg, vector<std::string> *allvars){
     for(std::string s : *allvars) if(s.find(arg) == 0) return true;
@@ -1081,4 +1131,35 @@ void KillCommand::execute() {
 
     this->free_args(args);
 }
+
+void WhoAmICommand::execute() {
+    const int uid = getuid();
+    const int gid = getgid();
+    string path = "/proc/p/environ";
+    string pid = std::to_string(getpid());
+    path.replace(6, 1, pid);
+    vector<std::string> *allvars;
+    try{
+        allvars = UnSetEnvCommand::ReadEnv(path);
+    }
+    catch(runtime_error& e) {
+
+        return;
+    }
+    std::string username;
+    std::string home_dir;
+
+    for(const std::string& current_entry : *allvars) {
+        if (current_entry.rfind("USER=", 0) == 0) {
+            username = current_entry.substr(5);
+        }
+        else if (current_entry.rfind("HOME=", 0) == 0) {
+            home_dir = current_entry.substr(5);
+        }
+    }
+    const std::string message =username + "\n" + to_string(uid) + "\n" + to_string(gid) + "\n" + home_dir + "\n";
+    write(1, message.c_str(), strlen(message.c_str()));
+    delete(allvars);
+}
+
 
