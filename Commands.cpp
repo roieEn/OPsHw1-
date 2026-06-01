@@ -279,6 +279,10 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     }
     catch(std::out_of_range& e){}
 
+    regex pattern = regex("^alias [a-zA-Z0-9_]+='[^']*'$");
+    if(regex_match(cmd_line, pattern)){
+        return new AliasCommand(cmd_line);
+    }
 
     //redirection command
     std::regex redidect_pattern = regex("^(.*?)\\s*(>>|>)\\s*([a-z0-9./_-]+)\\s*&?\\s*$");
@@ -297,6 +301,7 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
             pipe_parts[3].str().c_str());
     }
 
+
     if(firstWord.compare("chprompt") == 0){
         return new ChPrompt(cmd_line);
     }
@@ -306,9 +311,9 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     else if (firstWord.compare("sysinfo") == 0) {
         return new SysInfoCommand(cmd_line);
     }
-    else if(firstWord.compare("alias") == 0){
-        return new AliasCommand(cmd_line);
-    }
+    // else if(firstWord.compare("alias") == 0){
+    //     return new AliasCommand(cmd_line);
+    // }
     else if(firstWord.compare("unalias") == 0){
         return new UnAliasCommand(cmd_line);
     }
@@ -445,7 +450,8 @@ char** Command::make_args(){
     char** args = (char**) malloc(sizeof(char*) * 20);
     char* copy_cmd_line = strdup(cmd_line);
     _removeBackgroundSign(copy_cmd_line);
-    _parseCommandLine(copy_cmd_line, args);
+    for(int i =_parseCommandLine(copy_cmd_line, args); i< 20; i++)
+        args[i] = nullptr;
     return args;
 }
 
@@ -483,6 +489,7 @@ void ExternalCommand::execute() { //will always be the son
         execvp(args[0], args); //should leave automatically
         perror("smash error: execvp failed"); // there is no command like that/no fitting flags
         this->free_args(args);
+        exit(1);
     }
     else { //complex, using bash
         char* copy_cmd_line = strdup(this->get_cmd_line());
@@ -826,7 +833,7 @@ void DiskUsageCommand::execute(){
     free(p);
 
     int wight = Rec(path.c_str()), rem = wight%1024;
-    wight = (wight/1024) + (rem >= 512 ? 1 : 0); 
+    wight = (wight/1024) + (rem != 0 ? 1 : 0); 
     std::string ans = "Total disk usage: " + std::to_string(wight) + " KB\n";
     write(1, ans.c_str(), ans.length());
 }
