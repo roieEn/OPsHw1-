@@ -776,7 +776,7 @@ void DiskUsageCommand::execute(){
     free(p);
 
     int wight = Rec(path.c_str()), rem = wight%1024;
-    wight = (wight/1024) + (rem >= 512 ? 1 : 0); 
+    wight = (wight/1024) + (rem != 0 ? 1 : 0); 
     std::string ans = "Total disk usage: " + std::to_string(wight) + " KB\n";
     write(1, ans.c_str(), ans.length());
 }
