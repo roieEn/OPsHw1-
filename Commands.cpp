@@ -311,9 +311,9 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     else if (firstWord.compare("sysinfo") == 0) {
         return new SysInfoCommand(cmd_line);
     }
-    else if(firstWord.compare("alias") == 0){
-        return new AliasCommand(cmd_line);
-    }
+    // else if(firstWord.compare("alias") == 0){
+    //     return new AliasCommand(cmd_line);
+    // }
     else if(firstWord.compare("unalias") == 0){
         return new UnAliasCommand(cmd_line);
     }
@@ -447,7 +447,8 @@ char** Command::make_args(){
     char** args = (char**) malloc(sizeof(char*) * 20);
     char* copy_cmd_line = strdup(cmd_line);
     _removeBackgroundSign(copy_cmd_line);
-    _parseCommandLine(copy_cmd_line, args);
+    for(int i =_parseCommandLine(copy_cmd_line, args); i< 20; i++)
+        args[i] = nullptr;
     return args;
 }
 
