@@ -589,6 +589,9 @@ void UnSetEnvCommand::execute(){
             write(2, problem1, strlen(problem1));
             write(2, args[i], strlen(args[i]));
             write(2, problem2, strlen(problem2));
+            delete(allvars);
+            free_args(args);
+            return;
         }
     }
     delete(allvars);
