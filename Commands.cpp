@@ -279,6 +279,10 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     }
     catch(std::out_of_range& e){}
 
+    regex pattern = regex("^alias [a-zA-Z0-9_]+='[^']*'$");
+    if(regex_match(cmd_line, pattern)){
+        return new AliasCommand(cmd_line);
+    }
 
     //redirection command
     std::regex redidect_pattern = regex("^(.*?)\\s*(>>|>)\\s*([a-z0-9./_-]+)\\s*&?\\s*$");
@@ -296,6 +300,7 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
             pipe_parts[1].str().c_str(), pipe_parts[2].str().c_str(), 
             pipe_parts[3].str().c_str());
     }
+
 
     if(firstWord.compare("chprompt") == 0){
         return new ChPrompt(cmd_line);
@@ -480,6 +485,7 @@ void ExternalCommand::execute() { //will always be the son
         execvp(args[0], args); //should leave automatically
         perror("smash error: execvp failed"); // there is no command like that/no fitting flags
         this->free_args(args);
+        exit(1);
     }
     else { //complex, using bash
         char* copy_cmd_line = strdup(this->get_cmd_line());
