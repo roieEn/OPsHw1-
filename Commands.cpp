@@ -96,6 +96,7 @@ SmallShell::SmallShell() {
     strcpy(og_name, string("smash").c_str());
     curr_name = (char*) malloc(string(og_name).length() + 1);
     strcpy(curr_name, og_name);
+    pold_dir = nullptr;
     err_recover = -1;
     out_recover = -1;
     jobs = new JobsList();
@@ -105,6 +106,7 @@ SmallShell::SmallShell() {
 SmallShell::~SmallShell() {
     free(og_name);
     free(curr_name);
+    if(pold_dir != nullptr) free(pold_dir);
     delete jobs;
 }
 
@@ -330,7 +332,7 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
       return new ShowPidCommand(cmd_line);
     }
     else if (firstWord.compare("cd") == 0) {
-        return new ChangeDirCommand(cmd_line, nullptr);
+        return new ChangeDirCommand(cmd_line);
     }
     else if(firstWord.compare("quit") == 0){
         return new QuitCommand(cmd_line, jobs);
@@ -734,6 +736,7 @@ void RedirectionCommand::execute(){
 }
 
 void ChangeDirCommand::execute() {
+    SmallShell &s = SmallShell::getInstance();
     char** args = this->make_args();
     if (args[1] == nullptr) {
         this->free_args(args);
@@ -745,9 +748,9 @@ void ChangeDirCommand::execute() {
         this->free_args(args);
         return;
     }
-    char* path = args[1];
+    const char* path = args[1];
     if(strcmp(path, "-") == 0) {
-        path = *this->pold_dir;
+        path = s.GetPold();
         if(path == nullptr) {
             const std::string error_msg = "smash error: cd: OLDPWD not set\n";
             write(2, error_msg.c_str(), error_msg.length());
@@ -761,10 +764,7 @@ void ChangeDirCommand::execute() {
         free(current_dir);
     }
     else {
-        if(*this->pold_dir != nullptr) {
-            free(*this->pold_dir);
-        }
-        *this->pold_dir = current_dir;
+        s.SetPold(current_dir);
     }
     this->free_args(args);
 }

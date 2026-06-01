@@ -121,9 +121,8 @@ public:
 };
 
 class ChangeDirCommand : public BuiltInCommand {
-    char** pold_dir;
 public:
-    ChangeDirCommand(const char *cmd_line, char **plastPwd) : BuiltInCommand(cmd_line), pold_dir(plastPwd){}
+    ChangeDirCommand(const char *cmd_line) : BuiltInCommand(cmd_line){}
     virtual ~ChangeDirCommand() {
     }
 
@@ -299,6 +298,7 @@ private:
 
     char* og_name;
     char* curr_name;
+    char* pold_dir;
     int err_recover;
     int out_recover;
     int in_recover;
@@ -359,6 +359,10 @@ public:
     void setPid(int pid_num);
 
     int getPid() {return curr_pid;}
+
+    const char* GetPold(){return pold_dir;}
+
+    void SetPold(const char *new_pold){free(pold_dir); pold_dir = strdup(new_pold);}
 };
 
 #endif //SMASH_COMMAND_H_
