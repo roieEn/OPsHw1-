@@ -1195,10 +1195,10 @@ std::string USBInfoCommand::ReadUsbProperty(const std::string& path) {
 std::string USBInfoCommand::GetUsbProperties(const std::string& bus_port) { //bus port is from the shape [0-9]*-[0-9]*
     const int PROPERTIES_NUM = 6;
     std::string suffixes[PROPERTIES_NUM] = {"devnum", "idVendor", "idProduct", "manufacturer", "product", "bMaxPower"};
-    std::string path = "/sys/bus/usb/devices"; //found from tutorial 4 page 24 in the sysfs man page
+    std::string path = "/sys/bus/usb/devices/"; //found from tutorial 4 page 24 in the sysfs man page
     std::string properties[6];
     for(int i = 0; i < PROPERTIES_NUM; i++) {
-        std::string property = ReadUsbProperty(path + bus_port + suffixes[i]);
+        std::string property = ReadUsbProperty(path + bus_port + "/" + suffixes[i]);
         if(i <= 2 && property == "-1") { //those cannot be unknown if it is a USB
             return "-1";
         }
@@ -1215,7 +1215,7 @@ std::string USBInfoCommand::GetUsbProperties(const std::string& bus_port) { //bu
 
 void USBInfoCommand::execute() {
     const char* path = "/sys/bus/usb/devices";
-    int fd = open(path, O_RDONLY | O_DIRECTORY), sum = 0;
+    int fd = open(path, O_RDONLY | O_DIRECTORY);
     if(fd < 0){
         const char *problem = "smash error: open failed";
         perror(problem);
@@ -1245,7 +1245,7 @@ void USBInfoCommand::execute() {
     }
     close(fd);
     if(output == "") {
-        std::string message = "smash error: usbinfo: no USB devices found";
+        std::string message = "smash error: usbinfo: no USB devices found\n";
         write(2, message.c_str(), strlen(message.c_str()));
         return;
     }
