@@ -323,7 +323,7 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
         return new UnSetEnvCommand(cmd_line);
     }
     else if(firstWord.compare("du") == 0){
-        return new DiskUsageCommand(cmd_line);
+        return new DiskUsageCommand(cmd_line, bg, og_line);
     }
     else if(firstWord.compare("jobs") == 0){
         return new JobsCommand(cmd_line, this->jobs);
@@ -344,10 +344,10 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
         return new KillCommand(cmd_line, this->jobs);
     }
     else if(firstWord.compare("whoami") == 0) {
-        return new WhoAmICommand(cmd_line);
+        return new WhoAmICommand(cmd_line, bg, og_line);
     }
     else if(firstWord.compare("usbinfo") == 0) {
-        return new USBInfoCommand(cmd_line);
+        return new USBInfoCommand(cmd_line, bg, og_line);
     }
     else {
         return new ExternalCommand(cmd_line, bg, og_line);
@@ -361,6 +361,33 @@ void SmallShell::executeCommand(const char *cmd_line) {
     this->Zakka();
     Command* cmd = CreateCommand(cmd_line);
     if(ExternalCommand* extCmd = dynamic_cast<ExternalCommand*>(cmd)) {//if succeeds then cmd is external
+        if(dynamic_cast<DiskUsageCommand*>(cmd) != nullptr || 
+            dynamic_cast<WhoAmICommand*>(cmd) != nullptr || 
+            dynamic_cast<USBInfoCommand*>(cmd) != nullptr){
+                
+            if(!extCmd->is_bg){
+                extCmd->execute();
+                delete extCmd;
+                return;
+            }
+            else{
+                int p = fork();
+                if(p == -1){
+                        perror("smash error: fork failed");
+                        delete extCmd;
+                        return;
+                    }
+                if(p == 0){
+                        extCmd->execute();
+                        exit(0);
+                    }
+                else{
+                    this->Zakka();
+                    this->AddToJobList(extCmd, false, p);
+                    return;
+                }
+            }
+        }
         const pid_t p = fork();
         if(p > 0) { //parent
             if(!extCmd->is_bg) {

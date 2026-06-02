@@ -80,7 +80,7 @@ public:
     void execute() override;
 };
 
-class DiskUsageCommand : public Command {
+class DiskUsageCommand : public ExternalCommand {
 
     struct linux_dirent {
                unsigned long  d_ino;     /* Inode number */
@@ -91,7 +91,8 @@ class DiskUsageCommand : public Command {
 
     int Rec(const char* path);
 public:
-    DiskUsageCommand(const char *cmd_line) : Command(cmd_line) {}
+    DiskUsageCommand(const char *cmd_line, bool is_bg, std::string og_line) : 
+        ExternalCommand(cmd_line, is_bg, og_line) {}
 
     virtual ~DiskUsageCommand() {
     }
@@ -99,9 +100,10 @@ public:
     void execute() override;
 };
 
-class WhoAmICommand : public Command {
+class WhoAmICommand : public ExternalCommand {
 public:
-    WhoAmICommand(const char *cmd_line) : Command(cmd_line){}
+    WhoAmICommand(const char *cmd_line, bool is_bg, std::string og_line) : 
+        ExternalCommand(cmd_line, is_bg, og_line) {}
 
     virtual ~WhoAmICommand() {
     }
@@ -109,7 +111,7 @@ public:
     void execute() override;
 };
 
-class USBInfoCommand : public Command {
+class USBInfoCommand : public ExternalCommand {
     struct linux_dirent {
         unsigned long  d_ino;     /* Inode number */
         unsigned long  d_off;     /* Not an offset; see below */
@@ -119,7 +121,8 @@ class USBInfoCommand : public Command {
     std::string ReadUsbProperty(const std::string& path);
     std::string GetUsbProperties(const std::string& bus_port);
 public:
-    USBInfoCommand(const char *cmd_line) : Command(cmd_line) {}
+    USBInfoCommand(const char *cmd_line, bool is_bg, std::string og_line) : 
+        ExternalCommand(cmd_line, is_bg, og_line) {}
 
     virtual ~USBInfoCommand() {
     }
