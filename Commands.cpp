@@ -835,14 +835,20 @@ void DiskUsageCommand::execute(){
     std::string path = args[1] != NULL ? string(args[1]) : string(p);
     free(p);
 
-    int wight = Rec(path.c_str()), rem = wight%1024;
-    wight = (wight/1024) + (rem != 0 ? 1 : 0); 
-    std::string ans = "Total disk usage: " + std::to_string(wight) + " KB\n";
+    int weight = Rec(path.c_str()), rem = weight%1024;
+    weight = (weight/1024) + (rem != 0 ? 1 : 0); 
+    std::string ans = "Total disk usage: " + std::to_string(weight) + " KB\n";
     write(1, ans.c_str(), ans.length());
 }
 
 int DiskUsageCommand::Rec(const char* path){
-    int fd = open(path, O_RDONLY | O_DIRECTORY), sum = 0;
+    struct stat root_st;
+    if (lstat(path, &root_st) == -1) {
+        perror("smash error: lstat failed");
+        throw runtime_error("lstat failed");
+    }
+    int fd = open(path, O_RDONLY | O_DIRECTORY), 
+        sum = root_st.st_blocks * 512;
     if(fd < 0){
         const char *problem = "smash error: open failed";
         perror(problem);
@@ -858,8 +864,8 @@ int DiskUsageCommand::Rec(const char* path){
             struct stat st;
             string curr = string(path) + "/" + string(d->d_name);
             lstat(curr.c_str(), &st);
-            sum+=st.st_size;
             char d_type = *(buff + bpos + d->d_reclen - 1); //donno, took from man page
+            if(d_type != DT_DIR) sum += st.st_blocks * 512;
             if(d_type == DT_DIR && strcmp(d->d_name, ".") != 0 
                 && strcmp(d->d_name, "..") != 0){
                     paths_vec.push_back(curr);
