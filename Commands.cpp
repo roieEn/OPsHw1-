@@ -346,6 +346,9 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     else if(firstWord.compare("whoami") == 0) {
         return new WhoAmICommand(cmd_line);
     }
+    else if(firstWord.compare("usbinfo") == 0) {
+        return new USBInfoCommand(cmd_line);
+    }
     else {
         return new ExternalCommand(cmd_line, bg, og_line);
     }
@@ -1178,4 +1181,83 @@ void WhoAmICommand::execute() {
     delete(allvars);
 }
 
+std::string USBInfoCommand::ReadUsbProperty(const std::string& path) {
+    int fd = open(path.c_str(), O_RDONLY);
+    if(fd == -1) {
+        // perror("smash error: open failed"); it is okay for open to fail if the file doesnt exist, we don't want to crash
+        return "-1";
+    }
+    char buffer[1024];
+    int bytes_read = read(fd, buffer, sizeof(buffer)-1);
+    if(bytes_read == -1) {
+        perror("smash error: read failed");
+        close(fd);
+        return "-1";
+    }
+    buffer[bytes_read] = '\0';
+    if (buffer[bytes_read - 1] == '\n') //files ends with \n but we need them to be in the same line
+        buffer[bytes_read - 1] = '\0';
+
+    return std::string(buffer);
+}
+
+std::string USBInfoCommand::GetUsbProperties(const std::string& bus_port) { //bus port is from the shape [0-9]*-[0-9]*
+    const int PROPERTIES_NUM = 6;
+    std::string suffixes[PROPERTIES_NUM] = {"devnum", "idVendor", "idProduct", "manufacturer", "product", "bMaxPower"};
+    std::string path = "/sys/bus/usb/devices/"; //found from tutorial 4 page 24 in the sysfs man page
+    std::string properties[6];
+    for(int i = 0; i < PROPERTIES_NUM; i++) {
+        std::string property = ReadUsbProperty(path + bus_port + "/" + suffixes[i]);
+        if(i <= 2 && property == "-1") { //those cannot be unknown if it is a USB
+            return "-1";
+        }
+        if(property == "-1") { //i >= 3
+            property[i] = *"N/A";
+        }
+        properties[i] = property;
+    }
+    std::string ret = "Device " + properties[0] + ": ID " + properties[1] + ":" + properties[2];
+    ret += " " + properties[3] + " " + properties[4] + " MaxPower: " + properties[5] + "\n";
+    return ret;
+
+}
+
+void USBInfoCommand::execute() {
+    const char* path = "/sys/bus/usb/devices";
+    int fd = open(path, O_RDONLY | O_DIRECTORY);
+    if(fd < 0){
+        const char *problem = "smash error: open failed";
+        perror(problem);
+        throw runtime_error("open failed");
+    }
+    std::vector<std::string> paths_vec;
+    char buff[1024];
+    int nread = 1;
+    std::string output = "";
+    while(nread != 0){
+        nread = syscall(SYS_getdents, fd, buff,  1024);
+        for (int bpos = 0; bpos < nread;) {
+            struct linux_dirent *d = (struct linux_dirent *) (buff + bpos);
+            if (strcmp(d->d_name, ".") != 0 && strcmp(d->d_name, "..") != 0) {
+                std::string check_vendor_file = std::string(path) + "/" + std::string(d->d_name) + "/idVendor";
+                int fd_check = open(check_vendor_file.c_str(), O_RDONLY);
+                if(fd_check != -1) { //if file doesn't have idVendor it is not a USB device
+                    close(fd_check); //check ended
+                    std::string device_info = GetUsbProperties(std::string(d->d_name));
+                    if(device_info != "-1") { //read properties correctly
+                        output += device_info;
+                    }
+                }
+            }
+            bpos += d->d_reclen;
+        }
+    }
+    close(fd);
+    if(output == "") {
+        std::string message = "smash error: usbinfo: no USB devices found\n";
+        write(2, message.c_str(), strlen(message.c_str()));
+        return;
+    }
+    write(1, output.c_str(), strlen(output.c_str()));
+}
 

@@ -86,7 +86,7 @@ class DiskUsageCommand : public Command {
                unsigned long  d_ino;     /* Inode number */
                unsigned long  d_off;     /* Not an offset; see below */
                unsigned short d_reclen;  /* Length of this linux_dirent */
-               char           d_name[];  /* Filename (null-terminated) */
+               char           d_name[1];  /* Filename (null-terminated) */
            }; //deff didn't copy past from the manpage
 
     int Rec(const char* path);
@@ -110,9 +110,16 @@ public:
 };
 
 class USBInfoCommand : public Command {
-    // TODO: Add your data members **BONUS: 10 Points**
+    struct linux_dirent {
+        unsigned long  d_ino;     /* Inode number */
+        unsigned long  d_off;     /* Not an offset; see below */
+        unsigned short d_reclen;  /* Length of this linux_dirent */
+        char           d_name[1];  /* Filename (null-terminated) */
+    }; //deff didn't copy past from the manpage
+    std::string ReadUsbProperty(const std::string& path);
+    std::string GetUsbProperties(const std::string& bus_port);
 public:
-    USBInfoCommand(const char *cmd_line);
+    USBInfoCommand(const char *cmd_line) : Command(cmd_line) {}
 
     virtual ~USBInfoCommand() {
     }
