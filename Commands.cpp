@@ -399,11 +399,14 @@ void SmallShell::executeCommand(const char *cmd_line) {
             else {
                     this->Zakka();
                     this->AddToJobList(extCmd, false, p); //not sure what isStopped should be, when is it ever true and we want to add it?
+                    return;
             }
         }
         else { //child
             setpgrp();
             cmd->execute();
+            delete cmd;
+            exit(0);
         }
     }
     else{
@@ -458,7 +461,7 @@ void JobsList::killAllJobs(){
 int JobsList::GetSize() {return jobs.size();}
 
 JobsList::JobEntry* JobsList::getJobById(int id){
-    for(JobEntry j : jobs)
+    for(JobEntry& j : jobs)
         if(j.get_id() == id) {
             JobEntry *jp = &j;
             return jp;
@@ -1125,8 +1128,9 @@ void ForegroundCommand::execute() {
     }
     //if reached, id holds the correct JobId to bring forward
     JobsList::JobEntry* job_entry = this->jobs->getJobById(id);
+    std::string str_cmd_line = std::string(job_entry->get_cmd()->get_cmd_line());
     int job_pid = job_entry->get_pid();
-    const string print_str = std::string(job_entry->get_cmd()->get_cmd_line()) + " " + to_string(job_pid) + "\n";
+    const string print_str = str_cmd_line + " " + to_string(job_pid) + "\n";
     write(1, print_str.c_str(), strlen(print_str.c_str()));
     SmallShell& smash = SmallShell::getInstance();
     smash.setPid(job_pid);
@@ -1239,7 +1243,7 @@ std::string USBInfoCommand::GetUsbProperties(const std::string& bus_port) { //bu
             return "-1";
         }
         if(property == "-1") { //i >= 3
-            property[i] = *"N/A";
+            property = "N/A";
         }
         properties[i] = property;
     }
