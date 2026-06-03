@@ -284,6 +284,7 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
         cmd_s = _trim(cmd_s);
         firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
         cmd_line = cmd_s.c_str();
+        bg = _isBackgroundComamnd(cmd_line);
     }
     catch(std::out_of_range& e){}
 
@@ -367,7 +368,7 @@ void SmallShell::executeCommand(const char *cmd_line) {
     this->Zakka();
     Command* cmd = CreateCommand(cmd_line);
     if(ExternalCommand* extCmd = dynamic_cast<ExternalCommand*>(cmd)) {//if succeeds then cmd is external
-        if(dynamic_cast<DiskUsageCommand*>(cmd) != nullptr || 
+        if(dynamic_cast<DiskUsageCommand*>(cmd) != nullptr ||
             dynamic_cast<WhoAmICommand*>(cmd) != nullptr || 
             dynamic_cast<USBInfoCommand*>(cmd) != nullptr){
                 
