@@ -152,6 +152,12 @@ void SmallShell::removeAlias(const std::string& alias) {
         throw std::invalid_argument("no such alias in use");
     }
     aliases.erase(alias);
+    for(auto itr = alias_list.begin(); itr != alias_list.end(); itr++){
+        if((*itr).find(alias+"=") == 0){
+            alias_list.erase(itr);
+            break;
+        }
+    }
 }
 
 void SmallShell::RedirectOut(std::string out_path, options option){
@@ -313,9 +319,9 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     else if (firstWord.compare("sysinfo") == 0) {
         return new SysInfoCommand(cmd_line);
     }
-    // else if(firstWord.compare("alias") == 0){
-    //     return new AliasCommand(cmd_line);
-    // }
+    else if(firstWord.compare("alias") == 0){
+        return new AliasCommand(cmd_line);
+    }
     else if(firstWord.compare("unalias") == 0){
         return new UnAliasCommand(cmd_line);
     }
